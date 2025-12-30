@@ -192,65 +192,47 @@ namespace Camera2.Behaviours {
 			Color cClear = new Color(cSolid.r, cSolid.g, cSolid.b, 0.0f);
 
 			// Helper to draw a strip
-			void DrawFringedQuad(float x1, float x2, float y1, float y2, bool vert) {
+			void DrawFringedQuad(float x1, float x2, float y1, float y2, bool vert, float overlap) {
 				if(x1 >= x2 || y1 >= y2) return;
-				
-				// Draw Core (Inset by 0.5f to allow fringe)
-				// Actually, better logic:
-				// Main bar is from A to B.
-				// Outer edge is A. Inner edge is B. (Relative to screen border)
-				// Wait, these bars are inside the screen.
-				// For Top Bar:
-				// y from 0 to w.
-				// Outer Edge at y=0. Inner Edge at y=w.
-				// Fringe at y=0 goes from -0.5 to 0.5? No.
-				// Pixel 0 is center 0.5.
-				// Boundary 0.
-				// Let's assume standard coverage:
-				// Core: 0.5 to w-0.5.
-				// Outer Fringe: -0.5 to 0.5. (Alpha 0 -> 1)
-				// Inner Fringe: w-0.5 to w+0.5. (Alpha 1 -> 0)
 				
 				if(vert) {
 					// Vertical Bar (Left/Right)
-					// x1 to x2 is the 'width' direction.
-					// y1 to y2 is the 'length' direction.
-					// Fringe is along X.
+					// y is length direction. Apply overlap to y.
 					
-					// Core
+					// Core (Extended by overlap)
 					GL.Color(cSolid);
-					DrawQuadGeometry(x1 + 0.5f, x2 - 0.5f, y1, y2);
+					DrawQuadGeometry(x1 + 0.5f, x2 - 0.5f, y1 - overlap, y2 + overlap);
 					
-					// Outer Fringe (Left side of bar)
+					// Outer Fringe (Left side of bar) - Strict Length
 					DrawQuadColors(x1 - 0.5f, x1 + 0.5f, y1, y2, cClear, cSolid);
 					
-					// Inner Fringe (Right side of bar)
+					// Inner Fringe (Right side of bar) - Strict Length
 					DrawQuadColors(x2 - 0.5f, x2 + 0.5f, y1, y2, cSolid, cClear);
 				} else {
 					// Horizontal Bar (Top/Bottom)
-					// y1 to y2 is width.
+					// x is length direction. Apply overlap to x.
 					
-					// Core
+					// Core (Extended by overlap)
 					GL.Color(cSolid);
-					DrawQuadGeometry(x1, x2, y1 + 0.5f, y2 - 0.5f);
+					DrawQuadGeometry(x1 - overlap, x2 + overlap, y1 + 0.5f, y2 - 0.5f);
 					
-					// Outer Fringe (Top side)
+					// Outer Fringe (Top side) - Strict Length
 					DrawQuadColors(x1, x2, y1 - 0.5f, y1 + 0.5f, cClear, cSolid, true);
 					
-					// Inner Fringe (Bottom side)
+					// Inner Fringe (Bottom side) - Strict Length
 					DrawQuadColors(x1, x2, y2 - 0.5f, y2 + 0.5f, cSolid, cClear, true);
 				}
 			}
 
 			// Strips
 			// Top (Horizontal)
-			DrawFringedQuad(sTL - ov, viewWidth - sTR + ov, 0, w, false);
+			DrawFringedQuad(sTL, viewWidth - sTR, 0, w, false, ov);
 			// Bottom (Horizontal)
-			DrawFringedQuad(sBL - ov, viewWidth - sBR + ov, viewHeight - w, viewHeight, false);
+			DrawFringedQuad(sBL, viewWidth - sBR, viewHeight - w, viewHeight, false, ov);
 			// Left (Vertical)
-			DrawFringedQuad(0, w, sTL - ov, viewHeight - sBL + ov, true);
+			DrawFringedQuad(0, w, sTL, viewHeight - sBL, true, ov);
 			// Right (Vertical)
-			DrawFringedQuad(viewWidth - w, viewWidth, sTR - ov, viewHeight - sBR + ov, true);
+			DrawFringedQuad(viewWidth - w, viewWidth, sTR, viewHeight - sBR, true, ov);
 
 			// Corners
 			// Top-Left
