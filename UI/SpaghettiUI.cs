@@ -269,6 +269,19 @@ namespace Camera2.UI {
 		internal bool outline_cornerBR {
 			get => cam.settings.PostProcessing.outline.cornerBottomRight; set { cam.settings.PostProcessing.outline.cornerBottomRight = value; }
 		}
+		
+		internal bool outline_sideTop {
+			get => cam.settings.PostProcessing.outline.sideTop; set { cam.settings.PostProcessing.outline.sideTop = value; }
+		}
+		internal bool outline_sideBottom {
+			get => cam.settings.PostProcessing.outline.sideBottom; set { cam.settings.PostProcessing.outline.sideBottom = value; }
+		}
+		internal bool outline_sideLeft {
+			get => cam.settings.PostProcessing.outline.sideLeft; set { cam.settings.PostProcessing.outline.sideLeft = value; }
+		}
+		internal bool outline_sideRight {
+			get => cam.settings.PostProcessing.outline.sideRight; set { cam.settings.PostProcessing.outline.sideRight = value; }
+		}
 
 
 		internal float viewRect_x {

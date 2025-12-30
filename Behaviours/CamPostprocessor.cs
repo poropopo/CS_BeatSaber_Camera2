@@ -24,6 +24,12 @@ namespace Camera2.Behaviours {
 		public Color color = Color.cyan;
 		public float width = 0.05f;
 		public float radius = 0.0f;
+		
+		public bool sideTop = true;
+		public bool sideBottom = true;
+		public bool sideLeft = true;
+		public bool sideRight = true;
+
 		public bool cornerTopLeft = true;
 		public bool cornerTopRight = true;
 		public bool cornerBottomLeft = true;
@@ -164,15 +170,22 @@ namespace Camera2.Behaviours {
 			var sBL = w + rBL;
 			var sBR = w + rBR;
 			
+			// Determine corner visibility based on adjacent sides
+			bool showTL = settings.sideTop || settings.sideLeft;
+			bool showTR = settings.sideTop || settings.sideRight;
+			bool showBL = settings.sideBottom || settings.sideLeft;
+			bool showBR = settings.sideBottom || settings.sideRight;
+			
 			// --- Pass 1: Masking (Clear corners) ---
-			if(rTL > 0 || rTR > 0 || rBL > 0 || rBR > 0) {
+			// Only draw mask if corner is visible AND has radius
+			if((showTL && rTL > 0) || (showTR && rTR > 0) || (showBL && rBL > 0) || (showBR && rBR > 0)) {
 				maskMaterial.SetPass(0);
 				GL.Begin(GL.TRIANGLES);
 				GL.Color(Color.clear); 
-				if(rTL > 0) DrawCornerMask(0, 0, w, rTL, 0);
-				if(rTR > 0) DrawCornerMask(viewWidth, 0, w, rTR, 1);
-				if(rBR > 0) DrawCornerMask(viewWidth, viewHeight, w, rBR, 2);
-				if(rBL > 0) DrawCornerMask(0, viewHeight, w, rBL, 3);
+				if(showTL && rTL > 0) DrawCornerMask(0, 0, w, rTL, 0);
+				if(showTR && rTR > 0) DrawCornerMask(viewWidth, 0, w, rTR, 1);
+				if(showBR && rBR > 0) DrawCornerMask(viewWidth, viewHeight, w, rBR, 2);
+				if(showBL && rBL > 0) DrawCornerMask(0, viewHeight, w, rBL, 3);
 				GL.End();
 			}
 
@@ -226,23 +239,23 @@ namespace Camera2.Behaviours {
 
 			// Strips
 			// Top (Horizontal)
-			DrawFringedQuad(sTL, viewWidth - sTR, 0, w, false, ov);
+			if(settings.sideTop) DrawFringedQuad(sTL, viewWidth - sTR, 0, w, false, ov);
 			// Bottom (Horizontal)
-			DrawFringedQuad(sBL, viewWidth - sBR, viewHeight - w, viewHeight, false, ov);
+			if(settings.sideBottom) DrawFringedQuad(sBL, viewWidth - sBR, viewHeight - w, viewHeight, false, ov);
 			// Left (Vertical)
-			DrawFringedQuad(0, w, sTL, viewHeight - sBL, true, ov);
+			if(settings.sideLeft) DrawFringedQuad(0, w, sTL, viewHeight - sBL, true, ov);
 			// Right (Vertical)
-			DrawFringedQuad(viewWidth - w, viewWidth, sTR, viewHeight - sBR, true, ov);
+			if(settings.sideRight) DrawFringedQuad(viewWidth - w, viewWidth, sTR, viewHeight - sBR, true, ov);
 
 			// Corners
 			// Top-Left
-			DrawCornerFringed(0, 0, w, rTL, 0, cSolid, cClear, viewWidth, viewHeight);
+			if(showTL) DrawCornerFringed(0, 0, w, rTL, 0, cSolid, cClear, viewWidth, viewHeight);
 			// Top-Right
-			DrawCornerFringed(viewWidth, 0, w, rTR, 1, cSolid, cClear, viewWidth, viewHeight);
+			if(showTR) DrawCornerFringed(viewWidth, 0, w, rTR, 1, cSolid, cClear, viewWidth, viewHeight);
 			// Bottom-Right
-			DrawCornerFringed(viewWidth, viewHeight, w, rBR, 2, cSolid, cClear, viewWidth, viewHeight);
+			if(showBR) DrawCornerFringed(viewWidth, viewHeight, w, rBR, 2, cSolid, cClear, viewWidth, viewHeight);
 			// Bottom-Left
-			DrawCornerFringed(0, viewHeight, w, rBL, 3, cSolid, cClear, viewWidth, viewHeight);
+			if(showBL) DrawCornerFringed(0, viewHeight, w, rBL, 3, cSolid, cClear, viewWidth, viewHeight);
 
 			GL.End();
 			GL.PopMatrix();

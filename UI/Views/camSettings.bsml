@@ -155,6 +155,19 @@
 		</vertical>
 	</tab>
 
+	<tab tags='tabs' tab-name='Outline Sides'>
+		<vertical horizontal-fit='PreferredSize' vertical-fit='PreferredSize'>
+			<horizontal>
+				<checkbox text='Top' value='outline_sideTop' bind-value='true' apply-on-change='true'/>
+				<checkbox text='Bottom' value='outline_sideBottom' bind-value='true' apply-on-change='true'/>
+			</horizontal>
+			<horizontal>
+				<checkbox text='Left' value='outline_sideLeft' bind-value='true' apply-on-change='true'/>
+				<checkbox text='Right' value='outline_sideRight' bind-value='true' apply-on-change='true'/>
+			</horizontal>
+		</vertical>
+	</tab>
+
 	<tab tags='tabs' tab-name='Misc'>
 		<vertical horizontal-fit='PreferredSize' vertical-fit='PreferredSize' spacing='5'>
 			<horizontal preferred-width="90">
