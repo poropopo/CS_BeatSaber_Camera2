@@ -136,12 +136,15 @@ namespace Camera2.Behaviours {
 				outlineMaterial.SetInt("_ZWrite", 0);
 				outlineMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
 			}
-			outlineMaterial.SetPass(0);
 
-			GL.Begin(GL.TRIANGLES);
-			
-			// Fringe width (AA width)
-			float f = 1.0f;
+			if(maskMaterial == null) {
+				maskMaterial = new Material(Shader.Find("Hidden/Internal-Colored"));
+				maskMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+				maskMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
+				maskMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+				maskMaterial.SetInt("_ZWrite", 0);
+				maskMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+			}
 			
 			// Core Width and Radius
 			var w = settings.width * Math.Min(viewWidth, viewHeight);
@@ -160,6 +163,26 @@ namespace Camera2.Behaviours {
 			var sTR = w + rTR;
 			var sBL = w + rBL;
 			var sBR = w + rBR;
+			
+			// --- Pass 1: Masking (Clear corners) ---
+			if(rTL > 0 || rTR > 0 || rBL > 0 || rBR > 0) {
+				maskMaterial.SetPass(0);
+				GL.Begin(GL.TRIANGLES);
+				GL.Color(Color.clear); 
+				if(rTL > 0) DrawCornerMask(0, 0, w, rTL, 0);
+				if(rTR > 0) DrawCornerMask(viewWidth, 0, w, rTR, 1);
+				if(rBR > 0) DrawCornerMask(viewWidth, viewHeight, w, rBR, 2);
+				if(rBL > 0) DrawCornerMask(0, viewHeight, w, rBL, 3);
+				GL.End();
+			}
+
+			// --- Pass 2: Outline ---
+			outlineMaterial.SetPass(0);
+
+			GL.Begin(GL.TRIANGLES);
+			
+			// Fringe width (AA width)
+			float f = 1.0f;
 			
 			// Overlap amount to prevent hairline gaps
 			float ov = 0.1f;
@@ -402,6 +425,35 @@ namespace Camera2.Behaviours {
 				
 				// Outer Fringe
 				DrawSectorQuad(r_out_start, r_out_end, cSolid, cClear);
+			}
+		}
+
+		private Material maskMaterial;
+	
+		private void DrawCornerMask(float refX, float refY, float w, float r, int rotation) {
+			float mx = (rotation == 1 || rotation == 2) ? -1 : 1;
+			float my = (rotation == 2 || rotation == 3) ? -1 : 1;
+
+			void V(float lx, float ly) {
+				GL.Vertex3(refX + lx * mx, refY + ly * my, 0);
+			}
+
+			float s = w + r;
+			float r_out_end = s + 0.5f;
+
+			int segments = 45;
+			
+			for(int i = 0; i < segments; i++) {
+				float a1 = (180f + (90f * i / segments)) * Mathf.Deg2Rad;
+				float a2 = (180f + (90f * (i + 1) / segments)) * Mathf.Deg2Rad;
+
+				float cos1 = Mathf.Cos(a1); float sin1 = Mathf.Sin(a1);
+				float cos2 = Mathf.Cos(a2); float sin2 = Mathf.Sin(a2);
+
+				float x1 = s + cos1 * r_out_end; float y1 = s + sin1 * r_out_end;
+				float x2 = s + cos2 * r_out_end; float y2 = s + sin2 * r_out_end;
+				
+				V(0,0); V(x1, y1); V(x2, y2);
 			}
 		}
 	}
