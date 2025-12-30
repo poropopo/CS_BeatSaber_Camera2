@@ -160,6 +160,9 @@ namespace Camera2.Behaviours {
 			var sTR = w + rTR;
 			var sBL = w + rBL;
 			var sBR = w + rBR;
+			
+			// Overlap amount to prevent hairline gaps
+			float ov = 0.1f;
 
 			// Define Colors (Solid and Transparent)
 			Color cSolid = settings.color;
@@ -218,13 +221,13 @@ namespace Camera2.Behaviours {
 
 			// Strips
 			// Top (Horizontal)
-			DrawFringedQuad(sTL, viewWidth - sTR, 0, w, false);
+			DrawFringedQuad(sTL - ov, viewWidth - sTR + ov, 0, w, false);
 			// Bottom (Horizontal)
-			DrawFringedQuad(sBL, viewWidth - sBR, viewHeight - w, viewHeight, false);
+			DrawFringedQuad(sBL - ov, viewWidth - sBR + ov, viewHeight - w, viewHeight, false);
 			// Left (Vertical)
-			DrawFringedQuad(0, w, sTL, viewHeight - sBL, true);
+			DrawFringedQuad(0, w, sTL - ov, viewHeight - sBL + ov, true);
 			// Right (Vertical)
-			DrawFringedQuad(viewWidth - w, viewWidth, sTR, viewHeight - sBR, true);
+			DrawFringedQuad(viewWidth - w, viewWidth, sTR - ov, viewHeight - sBR + ov, true);
 
 			// Corners
 			// Top-Left
@@ -280,21 +283,60 @@ namespace Camera2.Behaviours {
 			}
 
 			if(r <= 0.001f) {
-				// Sharp Corner - Fringe Logic?
-				// Just draw the square with fringes on outer/inner?
-				// Since we connect to fringed bars, we need fringes here too.
-				// Outer Edge (Top and Left):
-				// Left Edge: x from -0.5 to 0.5. y from 0 to w.
-				// Top Edge: x from 0 to w. y from -0.5 to 0.5.
-				// Corner Tip? (-0.5, -0.5) to (0.5, 0.5).
-				// This implies a rounded outer corner of radius 0.5 (or square).
-				// Inner Edge (Bottom Right):
-				// From (w-0.5, 0) to (w+0.5, w).
+				// Sharp Corner Implementation
 				
-				// Let's just treat Sharp as Rounded with r=0.
-				// The Ring logic works for r=0 if we handle the degenerate inner radius correctly (which is ok).
-				// However, r=0 means S=W.
-				// Inner Radius r=0. Outer Radius s=W.
+				// 1. Solid Center
+				GL.Color(cSolid);
+				V(0.5f, 0.5f); V(w - 0.5f, 0.5f); V(w - 0.5f, w - 0.5f);
+				V(0.5f, 0.5f); V(w - 0.5f, w - 0.5f); V(0.5f, w - 0.5f);
+				
+				// 2. Outer Tip (Top-Left)
+				// Quad: -0.5,-0.5 to 0.5,0.5. TL/TR/BL Clear, BR Solid.
+				GL.Color(cClear); V(-0.5f, -0.5f);
+				GL.Color(cClear); V(0.5f, -0.5f);
+				GL.Color(cSolid); V(0.5f, 0.5f);
+				GL.Color(cClear); V(-0.5f, -0.5f);
+				GL.Color(cSolid); V(0.5f, 0.5f);
+				GL.Color(cClear); V(-0.5f, 0.5f);
+				
+				// 3. Inner Tip (Bottom-Right)
+				// Quad: w-.5, w-.5 to w+.5, w+.5. TL Solid, TR/BL/BR Clear.
+				GL.Color(cSolid); V(w - 0.5f, w - 0.5f);
+				GL.Color(cClear); V(w + 0.5f, w - 0.5f);
+				GL.Color(cClear); V(w + 0.5f, w + 0.5f);
+				GL.Color(cSolid); V(w - 0.5f, w - 0.5f);
+				GL.Color(cClear); V(w + 0.5f, w + 0.5f);
+				GL.Color(cClear); V(w - 0.5f, w + 0.5f);
+				
+				// 4. Outer Strips
+				// Top (Horizontal)
+				{
+					float x1 = 0.5f, x2 = w, y1 = -0.5f, y2 = 0.5f;
+					GL.Color(cClear); V(x1, y1); GL.Color(cClear); V(x2, y1); GL.Color(cSolid); V(x2, y2);
+					GL.Color(cClear); V(x1, y1); GL.Color(cSolid); V(x2, y2); GL.Color(cSolid); V(x1, y2);
+				}
+				// Left (Vertical)
+				{
+					float x1 = -0.5f, x2 = 0.5f, y1 = 0.5f, y2 = w;
+					GL.Color(cClear); V(x1, y1); GL.Color(cSolid); V(x2, y1); GL.Color(cSolid); V(x2, y2);
+					GL.Color(cClear); V(x1, y1); GL.Color(cSolid); V(x2, y2); GL.Color(cClear); V(x1, y2);
+				}
+
+				// 5. Inner Strips
+				// Top (Horizontal)
+				{
+					float x1 = 0.5f, x2 = w - 0.5f, y1 = w - 0.5f, y2 = w + 0.5f;
+					GL.Color(cSolid); V(x1, y1); GL.Color(cSolid); V(x2, y1); GL.Color(cClear); V(x2, y2);
+					GL.Color(cSolid); V(x1, y1); GL.Color(cClear); V(x2, y2); GL.Color(cClear); V(x1, y2);
+				}
+				// Left (Vertical)
+				{
+					float x1 = w - 0.5f, x2 = w + 0.5f, y1 = 0.5f, y2 = w - 0.5f;
+					GL.Color(cSolid); V(x1, y1); GL.Color(cClear); V(x2, y1); GL.Color(cClear); V(x2, y2);
+					GL.Color(cSolid); V(x1, y1); GL.Color(cClear); V(x2, y2); GL.Color(cSolid); V(x1, y2);
+				}
+				
+				return;
 			}
 
 			// Annulus Sector with Fringe
