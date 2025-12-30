@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Newtonsoft.Json;
 
 namespace Camera2.Behaviours {
 	class Settings_Shader {
@@ -16,6 +17,12 @@ namespace Camera2.Behaviours {
 		public string shaderName = "";
 
 		public readonly Dictionary<string, float> properties = new Dictionary<string, float>();
+	}
+
+	public class Settings_Outline {
+		public bool enabled = false;
+		public Color color = Color.cyan;
+		public float width = 0.05f;
 	}
 
 	class Settings_PostProcessing : CameraSubSettings {
@@ -31,12 +38,17 @@ namespace Camera2.Behaviours {
 		}
 
 		public Settings_Shader[] shaders = new Settings_Shader[0];
+
+		[JsonIgnore]
+		public Settings_Outline outline = new Settings_Outline();
 	}
 
 	class CamPostProcessor : MonoBehaviour {
 		private static readonly int Threshold = Shader.PropertyToID("_Threshold");
 		private static readonly int HasDepth = Shader.PropertyToID("_HasDepth");
 		private static readonly int Width = Shader.PropertyToID("_Width");
+
+		private Material outlineMaterial;
 
 		protected Cam2 cam;
 		protected CameraSettings settings => cam.settings;
@@ -92,11 +104,61 @@ namespace Camera2.Behaviours {
 				Graphics.Blit(main, dest);
 				if(main != _src)
 					RenderTexture.ReleaseTemporary(main);
+
+				if(settings.PostProcessing.outline.enabled) {
+					Graphics.SetRenderTarget(dest);
+					DrawOutline(_src.width, _src.height, settings.PostProcessing.outline);
+				}
+
 			} else {
 				Graphics.Blit(_src, dest);
+				if(settings.PostProcessing.outline.enabled) {
+					Graphics.SetRenderTarget(dest);
+					DrawOutline(_src.width, _src.height, settings.PostProcessing.outline);
+				}
 			}
 
 			cam.PostprocessCompleted();
+		}
+
+		private void DrawOutline(int viewWidth, int viewHeight, Settings_Outline settings) {
+			GL.PushMatrix();
+			GL.LoadPixelMatrix(0, viewWidth, viewHeight, 0);
+
+			if(outlineMaterial == null) outlineMaterial = new Material(Shader.Find("Hidden/Internal-Colored"));
+			outlineMaterial.SetPass(0);
+
+			GL.Begin(GL.QUADS);
+			GL.Color(settings.color);
+
+			var w = settings.width * Math.Min(viewWidth, viewHeight); // Hardcoded Width
+			
+			// Top
+			GL.Vertex3(0, 0, 0);
+			GL.Vertex3(viewWidth, 0, 0);
+			GL.Vertex3(viewWidth, w, 0);
+			GL.Vertex3(0, w, 0);
+
+			// Bottom
+			GL.Vertex3(0, viewHeight - w, 0);
+			GL.Vertex3(viewWidth, viewHeight - w, 0);
+			GL.Vertex3(viewWidth, viewHeight, 0);
+			GL.Vertex3(0, viewHeight, 0);
+
+			// Left
+			GL.Vertex3(0, w, 0);
+			GL.Vertex3(w, w, 0);
+			GL.Vertex3(w, viewHeight - w, 0);
+			GL.Vertex3(0, viewHeight - w, 0);
+
+			// Right
+			GL.Vertex3(viewWidth - w, w, 0);
+			GL.Vertex3(viewWidth, w, 0);
+			GL.Vertex3(viewWidth, viewHeight - w, 0);
+			GL.Vertex3(viewWidth - w, viewHeight - w, 0);
+
+			GL.End();
+			GL.PopMatrix();
 		}
 	}
 

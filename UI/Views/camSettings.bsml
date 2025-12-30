@@ -136,6 +136,16 @@
 		</vertical>
 	</tab>
 
+	<tab tags='tabs' tab-name='Outline'>
+		<vertical horizontal-fit='PreferredSize' vertical-fit='PreferredSize'>
+			<modifier-container child-expand-width='true' horizontal-fit='PreferredSize'>
+				<checkbox text='Enabled' value='outline_enabled' bind-value='true' apply-on-change='true'/>
+				<color-setting text='Color' value='outline_color' bind-value='true' apply-on-change='true'/>
+				<slider-setting text='Width' min='0.00' max='0.2' increment='0.001' value='outline_width' bind-value='true' apply-on-change='true'/>
+			</modifier-container>
+		</vertical>
+	</tab>
+
 	<tab tags='tabs' tab-name='Misc'>
 		<vertical horizontal-fit='PreferredSize' vertical-fit='PreferredSize' spacing='5'>
 			<horizontal preferred-width="90">

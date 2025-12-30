@@ -245,6 +245,16 @@ namespace Camera2.UI {
 			get => cam.settings.PostProcessing.forceDepthTexture; set { cam.settings.PostProcessing.forceDepthTexture = value; }
 		}
 
+		internal bool outline_enabled {
+			get => cam.settings.PostProcessing.outline.enabled; set { cam.settings.PostProcessing.outline.enabled = value; }
+		}
+		internal UnityEngine.Color outline_color {
+			get => cam.settings.PostProcessing.outline.color; set { cam.settings.PostProcessing.outline.color = value; }
+		}
+		internal float outline_width {
+			get => cam.settings.PostProcessing.outline.width; set { cam.settings.PostProcessing.outline.width = value; }
+		}
+
 
 		internal float viewRect_x {
 			get => cam.settings.viewRect.x; set => cam.settings.SetViewRect(value, null, null, null);
