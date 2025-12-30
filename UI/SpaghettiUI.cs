@@ -254,6 +254,21 @@ namespace Camera2.UI {
 		internal float outline_width {
 			get => cam.settings.PostProcessing.outline.width; set { cam.settings.PostProcessing.outline.width = value; }
 		}
+		internal float outline_radius {
+			get => cam.settings.PostProcessing.outline.radius; set { cam.settings.PostProcessing.outline.radius = value; }
+		}
+		internal bool outline_cornerTL {
+			get => cam.settings.PostProcessing.outline.cornerTopLeft; set { cam.settings.PostProcessing.outline.cornerTopLeft = value; }
+		}
+		internal bool outline_cornerTR {
+			get => cam.settings.PostProcessing.outline.cornerTopRight; set { cam.settings.PostProcessing.outline.cornerTopRight = value; }
+		}
+		internal bool outline_cornerBL {
+			get => cam.settings.PostProcessing.outline.cornerBottomLeft; set { cam.settings.PostProcessing.outline.cornerBottomLeft = value; }
+		}
+		internal bool outline_cornerBR {
+			get => cam.settings.PostProcessing.outline.cornerBottomRight; set { cam.settings.PostProcessing.outline.cornerBottomRight = value; }
+		}
 
 
 		internal float viewRect_x {

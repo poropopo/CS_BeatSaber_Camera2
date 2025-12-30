@@ -142,7 +142,16 @@
 				<checkbox text='Enabled' value='outline_enabled' bind-value='true' apply-on-change='true'/>
 				<color-setting text='Color' value='outline_color' bind-value='true' apply-on-change='true'/>
 				<slider-setting text='Width' min='0.00' max='0.2' increment='0.001' value='outline_width' bind-value='true' apply-on-change='true'/>
+				<slider-setting text='Corner Radius' min='0.00' max='0.5' increment='0.01' value='outline_radius' bind-value='true' apply-on-change='true'/>
 			</modifier-container>
+			<horizontal>
+				<checkbox text='Top Left' value='outline_cornerTL' bind-value='true' apply-on-change='true'/>
+				<checkbox text='Top Right' value='outline_cornerTR' bind-value='true' apply-on-change='true'/>
+			</horizontal>
+			<horizontal>
+				<checkbox text='Bottom Left' value='outline_cornerBL' bind-value='true' apply-on-change='true'/>
+				<checkbox text='Bottom Right' value='outline_cornerBR' bind-value='true' apply-on-change='true'/>
+			</horizontal>
 		</vertical>
 	</tab>
 

@@ -23,6 +23,11 @@ namespace Camera2.Behaviours {
 		public bool enabled = false;
 		public Color color = Color.cyan;
 		public float width = 0.05f;
+		public float radius = 0.0f;
+		public bool cornerTopLeft = true;
+		public bool cornerTopRight = true;
+		public bool cornerBottomLeft = true;
+		public bool cornerBottomRight = true;
 	}
 
 	class Settings_PostProcessing : CameraSubSettings {
@@ -128,37 +133,173 @@ namespace Camera2.Behaviours {
 			if(outlineMaterial == null) outlineMaterial = new Material(Shader.Find("Hidden/Internal-Colored"));
 			outlineMaterial.SetPass(0);
 
-			GL.Begin(GL.QUADS);
+			GL.Begin(GL.TRIANGLES);
 			GL.Color(settings.color);
 
-			var w = settings.width * Math.Min(viewWidth, viewHeight); // Hardcoded Width
+			var w = settings.width * Math.Min(viewWidth, viewHeight);
+			var r = settings.radius * Math.Min(viewWidth, viewHeight);
+
+			// Clamp r to be reasonable
+			if(r < 0) r = 0;
 			
-			// Top
-			GL.Vertex3(0, 0, 0);
-			GL.Vertex3(viewWidth, 0, 0);
-			GL.Vertex3(viewWidth, w, 0);
-			GL.Vertex3(0, w, 0);
+			// Define the "Corner Size" S.
+			// The straight strips will go from S to Width-S.
+			// Ideally S = w + r.
+			// If a corner is NOT rounded, effectively r=0 for that corner, but for code simplicity we keep S uniform or handle per corner?
+			// Let's handle per corner.
 
-			// Bottom
-			GL.Vertex3(0, viewHeight - w, 0);
-			GL.Vertex3(viewWidth, viewHeight - w, 0);
-			GL.Vertex3(viewWidth, viewHeight, 0);
-			GL.Vertex3(0, viewHeight, 0);
+			float GetR(bool enabled) => enabled ? r : 0;
+			
+			var rTL = GetR(settings.cornerTopLeft);
+			var rTR = GetR(settings.cornerTopRight);
+			var rBL = GetR(settings.cornerBottomLeft);
+			var rBR = GetR(settings.cornerBottomRight);
 
-			// Left
-			GL.Vertex3(0, w, 0);
-			GL.Vertex3(w, w, 0);
-			GL.Vertex3(w, viewHeight - w, 0);
-			GL.Vertex3(0, viewHeight - w, 0);
+			var sTL = w + rTL;
+			var sTR = w + rTR;
+			var sBL = w + rBL;
+			var sBR = w + rBR;
 
-			// Right
-			GL.Vertex3(viewWidth - w, w, 0);
-			GL.Vertex3(viewWidth, w, 0);
-			GL.Vertex3(viewWidth, viewHeight - w, 0);
-			GL.Vertex3(viewWidth - w, viewHeight - w, 0);
+			// Strips
+			// Top: x from sTL to Width-sTR, y from 0 to w
+			DrawQuad(sTL, viewWidth - sTR, 0, w);
+			// Bottom: x from sBL to Width-sBR, y from Height-w to Height
+			DrawQuad(sBL, viewWidth - sBR, viewHeight - w, viewHeight);
+			// Left: x from 0 to w, y from sTL to Height-sBL
+			DrawQuad(0, w, sTL, viewHeight - sBL);
+			// Right: x from Width-w to Width, y from sTR to Height-sBR
+			DrawQuad(viewWidth - w, viewWidth, sTR, viewHeight - sBR);
+
+			// Corners
+			// Top-Left
+			DrawCorner(0, 0, sTL, w, rTL, 0, 0); // Rotation 0: Top-Left logic
+			// Top-Right
+			DrawCorner(viewWidth - sTR, 0, sTR, w, rTR, 1, viewWidth - sTR);
+			// Bottom-Right
+			DrawCorner(viewWidth - sBR, viewHeight - sBR, sBR, w, rBR, 2, viewWidth - sBR, viewHeight - sBR);
+			// Bottom-Left
+			DrawCorner(0, viewHeight - sBL, sBL, w, rBL, 3, 0, viewHeight - sBL);
 
 			GL.End();
 			GL.PopMatrix();
+		}
+
+		private void DrawQuad(float x1, float x2, float y1, float y2) {
+			if(x1 >= x2 || y1 >= y2) return;
+			GL.Vertex3(x1, y1, 0);
+			GL.Vertex3(x2, y1, 0);
+			GL.Vertex3(x2, y2, 0);
+			GL.Vertex3(x1, y1, 0);
+			GL.Vertex3(x2, y2, 0);
+			GL.Vertex3(x1, y2, 0);
+		}
+
+		private void DrawCorner(float x, float y, float s, float w, float r, int rotation, float refX, float refY = 0) {
+			// Logic is for Top-Left at 0,0 with S.
+			// Vertices will be translated by x,y at the end.
+			// Actually simpler: Generate relative vertices for Top-Left, then rotate/translate.
+			
+			// Polygon for Top-Left corner (0,0, size S).
+			// Vertices: (S,w) -> (S,0) -> (0,0) -> (0,S) -> (w,S) -> Arc -> (S,w)
+			// Arc center is (S,S), radius r.
+			// Angles for Top-Left Arc: From 180 to 270 degrees (if 0 is right, 90 is up?).
+			// Wait, standard trig: 0 is Right, 90 is Up (screen Y is down usually, but here 0 is top?).
+			// PixelMatrix: 0 is Top.
+			// Center (S,S). 
+			// P1 (S,w). Vector (0, w-S) = (0, -r). Angle -90 (or 270).
+			// P2 (w,S). Vector (w-S, 0) = (-r, 0). Angle 180.
+			// So Arc is 180 -> 270 degrees.
+			
+			// If r=0, just (S,w)-(S,0)-(0,0)-(0,S)-(w,S)-(w,w)-(S,w)
+            // Or just (w,w)-(w,0)-(0,0)-(0,w) for the missing block.
+			
+			List<Vector2> verts = new List<Vector2>();
+			
+			if(r <= 0.001f) {
+				// Sharp Corner fill
+				// We need to fill the L shape [0,w]x[0,w].
+                // But S=w.
+				// Rects: [0,w]x[0,w]
+				verts.Add(new Vector2(w, w));
+				verts.Add(new Vector2(w, 0));
+				verts.Add(new Vector2(0, 0));
+				verts.Add(new Vector2(0, w));
+			} else {
+				verts.Add(new Vector2(s, w)); // Start of arc
+				verts.Add(new Vector2(s, 0)); // Top edge
+				verts.Add(new Vector2(0, 0)); // Corner tip
+				verts.Add(new Vector2(0, s)); // Left edge
+				verts.Add(new Vector2(w, s)); // End of arc
+
+				// Arc
+				int segments = 10;
+				for(int i = 0; i <= segments; i++) {
+					// 180 to 270
+					float angRad = (180f + (90f * i / segments)) * Mathf.Deg2Rad;
+					float cx = s + Mathf.Cos(angRad) * r;
+					float cy = s + Mathf.Sin(angRad) * r;
+					verts.Add(new Vector2(cx, cy));
+				}
+			}
+
+			// Rotate and Translate
+			// Center of 'local' rotation effectively 0,0? No.
+			// We defined it in Top-Left orientation.
+			// Rotation 0: (x,y) -> (x,y)
+			// Rotation 1 (Top-Right): x -> -y, y -> x ? No, easiest to just hardcode mapping.
+			// Rotation 1 implies mirroring X?
+			
+			// Let's just create points relative to corner specific origin?
+			// Top-Left: Origin 0,0. Positive X, Positive Y.
+			// Top-Right: Origin W,0. Negative X, Positive Y.
+			// Bottom-Right: Origin W,H. Negative X, Negative Y.
+			// Bottom-Left: Origin 0,H. Positive X, Negative Y.
+			
+			float mx = (rotation == 1 || rotation == 2) ? -1 : 1;
+			float my = (rotation == 2 || rotation == 3) ? -1 : 1;
+			
+			// Central Point for triangle fan. Use the first point? Or (0,0)?
+			// Convex polygon? No, it's L-shaped which is Concave.
+			// Must decompose into triangles.
+			// Simple fan from (0,0) (Corner tip) works for this shape!
+			// (0,0) connects to everything.
+			
+			// Vertex 2 (0,0) index in list is 2 (Sharp) or 2 (Rounded).
+			// Let's reorder to put (0,0) first for Fan.
+			// Sharp: (0,0), (0,w), (w,w), (w,0).
+			// Rounded: (0,0), (0,s), (w,s), ...arc..., (s,w), (s,0).
+			
+			// Rebuild verts list for Fan logic
+			verts.Clear();
+			verts.Add(new Vector2(0, 0));
+			if(r <= 0.001f) {
+				verts.Add(new Vector2(0, w));
+				verts.Add(new Vector2(w, w));
+				verts.Add(new Vector2(w, 0));
+			} else {
+				verts.Add(new Vector2(0, s));
+				verts.Add(new Vector2(w, s));
+				int segments = 90;
+				for(int i = 0; i <= segments; i++) {
+					float angRad = (180f + (90f * i / segments)) * Mathf.Deg2Rad;
+					float cx = s + Mathf.Cos(angRad) * r;
+					float cy = s + Mathf.Sin(angRad) * r;
+					verts.Add(new Vector2(cx, cy));
+				}
+				verts.Add(new Vector2(s, 0));
+			}
+
+			// Draw Triangles
+			Vector2 center = verts[0];
+			for(int i = 1; i < verts.Count - 1; i++) {
+				Vector2 p1 = verts[i];
+				Vector2 p2 = verts[i+1];
+
+				// Apply Transform
+				GL.Vertex3(refX + center.x * mx, refY + center.y * my, 0);
+				GL.Vertex3(refX + p1.x * mx, refY + p1.y * my, 0);
+				GL.Vertex3(refX + p2.x * mx, refY + p2.y * my, 0);
+			}
 		}
 	}
 
