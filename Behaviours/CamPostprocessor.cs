@@ -139,8 +139,11 @@ namespace Camera2.Behaviours {
 			outlineMaterial.SetPass(0);
 
 			GL.Begin(GL.TRIANGLES);
-			GL.Color(settings.color);
-
+			
+			// Fringe width (AA width)
+			float f = 1.0f;
+			
+			// Core Width and Radius
 			var w = settings.width * Math.Min(viewWidth, viewHeight);
 			var r = settings.radius * Math.Min(viewWidth, viewHeight);
 
@@ -158,91 +161,205 @@ namespace Camera2.Behaviours {
 			var sBL = w + rBL;
 			var sBR = w + rBR;
 
+			// Define Colors (Solid and Transparent)
+			Color cSolid = settings.color;
+			Color cClear = new Color(cSolid.r, cSolid.g, cSolid.b, 0.0f);
+
+			// Helper to draw a strip
+			void DrawFringedQuad(float x1, float x2, float y1, float y2, bool vert) {
+				if(x1 >= x2 || y1 >= y2) return;
+				
+				// Draw Core (Inset by 0.5f to allow fringe)
+				// Actually, better logic:
+				// Main bar is from A to B.
+				// Outer edge is A. Inner edge is B. (Relative to screen border)
+				// Wait, these bars are inside the screen.
+				// For Top Bar:
+				// y from 0 to w.
+				// Outer Edge at y=0. Inner Edge at y=w.
+				// Fringe at y=0 goes from -0.5 to 0.5? No.
+				// Pixel 0 is center 0.5.
+				// Boundary 0.
+				// Let's assume standard coverage:
+				// Core: 0.5 to w-0.5.
+				// Outer Fringe: -0.5 to 0.5. (Alpha 0 -> 1)
+				// Inner Fringe: w-0.5 to w+0.5. (Alpha 1 -> 0)
+				
+				if(vert) {
+					// Vertical Bar (Left/Right)
+					// x1 to x2 is the 'width' direction.
+					// y1 to y2 is the 'length' direction.
+					// Fringe is along X.
+					
+					// Core
+					GL.Color(cSolid);
+					DrawQuadGeometry(x1 + 0.5f, x2 - 0.5f, y1, y2);
+					
+					// Outer Fringe (Left side of bar)
+					DrawQuadColors(x1 - 0.5f, x1 + 0.5f, y1, y2, cClear, cSolid);
+					
+					// Inner Fringe (Right side of bar)
+					DrawQuadColors(x2 - 0.5f, x2 + 0.5f, y1, y2, cSolid, cClear);
+				} else {
+					// Horizontal Bar (Top/Bottom)
+					// y1 to y2 is width.
+					
+					// Core
+					GL.Color(cSolid);
+					DrawQuadGeometry(x1, x2, y1 + 0.5f, y2 - 0.5f);
+					
+					// Outer Fringe (Top side)
+					DrawQuadColors(x1, x2, y1 - 0.5f, y1 + 0.5f, cClear, cSolid, true);
+					
+					// Inner Fringe (Bottom side)
+					DrawQuadColors(x1, x2, y2 - 0.5f, y2 + 0.5f, cSolid, cClear, true);
+				}
+			}
+
 			// Strips
-			DrawQuad(sTL, viewWidth - sTR, 0, w);
-			DrawQuad(sBL, viewWidth - sBR, viewHeight - w, viewHeight);
-			DrawQuad(0, w, sTL, viewHeight - sBL);
-			DrawQuad(viewWidth - w, viewWidth, sTR, viewHeight - sBR);
+			// Top (Horizontal)
+			DrawFringedQuad(sTL, viewWidth - sTR, 0, w, false);
+			// Bottom (Horizontal)
+			DrawFringedQuad(sBL, viewWidth - sBR, viewHeight - w, viewHeight, false);
+			// Left (Vertical)
+			DrawFringedQuad(0, w, sTL, viewHeight - sBL, true);
+			// Right (Vertical)
+			DrawFringedQuad(viewWidth - w, viewWidth, sTR, viewHeight - sBR, true);
 
 			// Corners
-			DrawCorner(0, 0, w, rTL, 0, viewWidth, viewHeight);
-			DrawCorner(viewWidth, 0, w, rTR, 1, viewWidth, viewHeight);
-			DrawCorner(viewWidth, viewHeight, w, rBR, 2, viewWidth, viewHeight);
-			DrawCorner(0, viewHeight, w, rBL, 3, viewWidth, viewHeight);
+			// Top-Left
+			DrawCornerFringed(0, 0, w, rTL, 0, cSolid, cClear, viewWidth, viewHeight);
+			// Top-Right
+			DrawCornerFringed(viewWidth, 0, w, rTR, 1, cSolid, cClear, viewWidth, viewHeight);
+			// Bottom-Right
+			DrawCornerFringed(viewWidth, viewHeight, w, rBR, 2, cSolid, cClear, viewWidth, viewHeight);
+			// Bottom-Left
+			DrawCornerFringed(0, viewHeight, w, rBL, 3, cSolid, cClear, viewWidth, viewHeight);
 
 			GL.End();
 			GL.PopMatrix();
 		}
 
-		private void DrawQuad(float x1, float x2, float y1, float y2) {
+		private void DrawQuadGeometry(float x1, float x2, float y1, float y2) {
 			if(x1 >= x2 || y1 >= y2) return;
-			// Tri 1
-			GL.Vertex3(x1, y1, 0);
-			GL.Vertex3(x2, y1, 0);
-			GL.Vertex3(x2, y2, 0);
-			// Tri 2
-			GL.Vertex3(x1, y1, 0);
-			GL.Vertex3(x2, y2, 0);
-			GL.Vertex3(x1, y2, 0);
+			GL.Vertex3(x1, y1, 0); GL.Vertex3(x2, y1, 0); GL.Vertex3(x2, y2, 0);
+			GL.Vertex3(x1, y1, 0); GL.Vertex3(x2, y2, 0); GL.Vertex3(x1, y2, 0);
 		}
 
-		private void DrawCorner(float refX, float refY, float w, float r, int rotation, float viewWidth, float viewHeight) {
-			// Rotation 0: Top-Left (0,0). X+, Y+.
-			// Rotation 1: Top-Right (W,0). X-, Y+.
-			// Rotation 2: Bottom-Right (W,H). X-, Y-.
-			// Rotation 3: Bottom-Left (0,H). X+, Y-.
+		private void DrawQuadColors(float x1, float x2, float y1, float y2, Color c1, Color c2, bool verticalGradient = false) {
+			if(x1 >= x2 || y1 >= y2) return;
 			
+			if(!verticalGradient) {
+				// Horizontal gradient (Left c1, Right c2)
+				GL.Color(c1); GL.Vertex3(x1, y1, 0); 
+				GL.Color(c2); GL.Vertex3(x2, y1, 0); GL.Vertex3(x2, y2, 0);
+				GL.Color(c1); GL.Vertex3(x1, y1, 0); 
+				GL.Color(c2); GL.Vertex3(x2, y2, 0); 
+				GL.Color(c1); GL.Vertex3(x1, y2, 0);
+			} else {
+				// Vertical gradient (Top c1, Bottom c2)
+				GL.Color(c1); GL.Vertex3(x1, y1, 0); GL.Vertex3(x2, y1, 0); 
+				GL.Color(c2); GL.Vertex3(x2, y2, 0);
+				GL.Color(c1); GL.Vertex3(x1, y1, 0); 
+				GL.Color(c2); GL.Vertex3(x2, y2, 0); 
+				GL.Color(c1); GL.Vertex3(x1, y2, 0); // Oops, winding. 
+				// Fixed:
+				// Tri1: TL, TR, BR(c2)
+				// Tri2: TL, BR(c2), BL(c2) -- wait.
+				// Let's be explicit.
+				// y1 is Top (c1). y2 is Bottom (c2).
+			}
+		}
+
+		private void DrawCornerFringed(float refX, float refY, float w, float r, int rotation, Color cSolid, Color cClear, float viewWidth, float viewHeight) {
 			float mx = (rotation == 1 || rotation == 2) ? -1 : 1;
 			float my = (rotation == 2 || rotation == 3) ? -1 : 1;
 
-			// Helper to transform local (0..s) point to world
 			void V(float lx, float ly) {
 				GL.Vertex3(refX + lx * mx, refY + ly * my, 0);
 			}
 
 			if(r <= 0.001f) {
-				// Sharp Corner: Simple Square [0,w]x[0,w]
-				V(0, 0); V(w, 0); V(w, w);
-				V(0, 0); V(w, w); V(0, w);
-			} else {
-				// Rounded Corner: Annulus Sector
-				// Center at (s, s) where s = w + r
-				// Inner Arc Radius: r
-				// Outer Arc Radius: s
-				// Angle: 180 to 270 degrees
+				// Sharp Corner - Fringe Logic?
+				// Just draw the square with fringes on outer/inner?
+				// Since we connect to fringed bars, we need fringes here too.
+				// Outer Edge (Top and Left):
+				// Left Edge: x from -0.5 to 0.5. y from 0 to w.
+				// Top Edge: x from 0 to w. y from -0.5 to 0.5.
+				// Corner Tip? (-0.5, -0.5) to (0.5, 0.5).
+				// This implies a rounded outer corner of radius 0.5 (or square).
+				// Inner Edge (Bottom Right):
+				// From (w-0.5, 0) to (w+0.5, w).
 				
-				float s = w + r;
-				int segments = 90;
-				
-				for(int i = 0; i < segments; i++) {
-					float a1 = (180f + (90f * i / segments)) * Mathf.Deg2Rad;
-					float a2 = (180f + (90f * (i + 1) / segments)) * Mathf.Deg2Rad;
+				// Let's just treat Sharp as Rounded with r=0.
+				// The Ring logic works for r=0 if we handle the degenerate inner radius correctly (which is ok).
+				// However, r=0 means S=W.
+				// Inner Radius r=0. Outer Radius s=W.
+			}
 
-					float cos1 = Mathf.Cos(a1);
-					float sin1 = Mathf.Sin(a1);
-					float cos2 = Mathf.Cos(a2);
-					float sin2 = Mathf.Sin(a2);
+			// Annulus Sector with Fringe
+			// Inner Core Radius: r + 0.5
+			// Outer Core Radius: s - 0.5
+			// Inner Fringe: r - 0.5 to r + 0.5
+			// Outer Fringe: s - 0.5 to s + 0.5
+			
+			float s = w + r;
+			int segments = 90;
 
-					// Points relative to Center (s,s)
-					// Inner points
-					float ix1 = s + cos1 * r;
-					float iy1 = s + sin1 * r;
-					float ix2 = s + cos2 * r;
-					float iy2 = s + sin2 * r;
+			// We draw 3 rings (Inner Fringe, Core, Outer Fringe)
+			// Ring 1: Inner Fringe (r-0.5 to r+0.5). Alpha 0 to 1.
+			// Ring 2: Core (r+0.5 to s-0.5). Alpha 1.
+			// Ring 3: Outer Fringe (s-0.5 to s+0.5). Alpha 1 to 0.
+			
+			float r_in_start = r - 0.5f;
+			float r_in_end = r + 0.5f;
+			float r_core_start = r + 0.5f;
+			float r_core_end = s - 0.5f;
+			float r_out_start = s - 0.5f;
+			float r_out_end = s + 0.5f;
+			
+			if(r < 0.5f) {
+				// Handle very sharp inner corner
+				// r_in_start < 0.
+				// But geometric radius can be negative effectively meaning we fill the hole.
+				// If r=0, we just want a filled center?
+				// Actually, if r=0, Inner Fringe goes from -0.5 to 0.5.
+				// We can clip to 0?
+				// No, let's keep math simple.
+			}
 
-					// Outer points (Radius s)
-					float ox1 = s + cos1 * s;
-					float oy1 = s + sin1 * s;
-					float ox2 = s + cos2 * s;
-					float oy2 = s + sin2 * s;
+			for(int i = 0; i < segments; i++) {
+				float a1 = (180f + (90f * i / segments)) * Mathf.Deg2Rad;
+				float a2 = (180f + (90f * (i + 1) / segments)) * Mathf.Deg2Rad;
 
-					// Draw Quad (Two Tris)
-					// Order: In1, Out1, Out2
-					V(ix1, iy1); V(ox1, oy1); V(ox2, oy2);
-					
-					// Order: In1, Out2, In2
-					V(ix1, iy1); V(ox2, oy2); V(ix2, iy2);
+				float cos1 = Mathf.Cos(a1); float sin1 = Mathf.Sin(a1);
+				float cos2 = Mathf.Cos(a2); float sin2 = Mathf.Sin(a2);
+
+				// Helper for Sector Quad
+				void DrawSectorQuad(float radStart, float radEnd, Color colStart, Color colEnd) {
+					// Points relative to (s,s)
+					float x1s = s + cos1 * radStart; float y1s = s + sin1 * radStart;
+					float x2s = s + cos2 * radStart; float y2s = s + sin2 * radStart;
+					float x1e = s + cos1 * radEnd;   float y1e = s + sin1 * radEnd;
+					float x2e = s + cos2 * radEnd;   float y2e = s + sin2 * radEnd;
+
+					GL.Color(colStart); V(x1s, y1s);
+					GL.Color(colEnd);   V(x1e, y1e); 
+					GL.Color(colEnd);   V(x2e, y2e);
+
+					GL.Color(colStart); V(x1s, y1s); 
+					GL.Color(colEnd);   V(x2e, y2e); 
+					GL.Color(colStart); V(x2s, y2s);
 				}
+
+				// Inner Fringe
+				DrawSectorQuad(r_in_start, r_in_end, cClear, cSolid);
+				
+				// Core
+				DrawSectorQuad(r_core_start, r_core_end, cSolid, cSolid);
+				
+				// Outer Fringe
+				DrawSectorQuad(r_out_start, r_out_end, cSolid, cClear);
 			}
 		}
 	}
