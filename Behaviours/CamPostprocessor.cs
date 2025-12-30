@@ -194,8 +194,7 @@ namespace Camera2.Behaviours {
 
 			GL.Begin(GL.TRIANGLES);
 			
-			// Fringe width (AA width)
-			float f = 1.0f;
+
 			
 			// Overlap amount to prevent hairline gaps
 			float ov = 0.1f;
