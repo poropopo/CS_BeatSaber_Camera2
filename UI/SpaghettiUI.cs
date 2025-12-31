@@ -245,6 +245,44 @@ namespace Camera2.UI {
 			get => cam.settings.PostProcessing.forceDepthTexture; set { cam.settings.PostProcessing.forceDepthTexture = value; }
 		}
 
+		internal bool outline_enabled {
+			get => cam.settings.PostProcessing.outline.enabled; set { cam.settings.PostProcessing.outline.enabled = value; }
+		}
+		internal UnityEngine.Color outline_color {
+			get => cam.settings.PostProcessing.outline.color; set { cam.settings.PostProcessing.outline.color = value; }
+		}
+		internal float outline_width {
+			get => cam.settings.PostProcessing.outline.width; set { cam.settings.PostProcessing.outline.width = value; }
+		}
+		internal float outline_radius {
+			get => cam.settings.PostProcessing.outline.radius; set { cam.settings.PostProcessing.outline.radius = value; }
+		}
+		internal bool outline_cornerTL {
+			get => cam.settings.PostProcessing.outline.cornerTopLeft; set { cam.settings.PostProcessing.outline.cornerTopLeft = value; }
+		}
+		internal bool outline_cornerTR {
+			get => cam.settings.PostProcessing.outline.cornerTopRight; set { cam.settings.PostProcessing.outline.cornerTopRight = value; }
+		}
+		internal bool outline_cornerBL {
+			get => cam.settings.PostProcessing.outline.cornerBottomLeft; set { cam.settings.PostProcessing.outline.cornerBottomLeft = value; }
+		}
+		internal bool outline_cornerBR {
+			get => cam.settings.PostProcessing.outline.cornerBottomRight; set { cam.settings.PostProcessing.outline.cornerBottomRight = value; }
+		}
+		
+		internal bool outline_sideTop {
+			get => cam.settings.PostProcessing.outline.sideTop; set { cam.settings.PostProcessing.outline.sideTop = value; }
+		}
+		internal bool outline_sideBottom {
+			get => cam.settings.PostProcessing.outline.sideBottom; set { cam.settings.PostProcessing.outline.sideBottom = value; }
+		}
+		internal bool outline_sideLeft {
+			get => cam.settings.PostProcessing.outline.sideLeft; set { cam.settings.PostProcessing.outline.sideLeft = value; }
+		}
+		internal bool outline_sideRight {
+			get => cam.settings.PostProcessing.outline.sideRight; set { cam.settings.PostProcessing.outline.sideRight = value; }
+		}
+
 
 		internal float viewRect_x {
 			get => cam.settings.viewRect.x; set => cam.settings.SetViewRect(value, null, null, null);
