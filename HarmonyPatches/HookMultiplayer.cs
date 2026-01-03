@@ -2,13 +2,15 @@
 using HarmonyLib;
 
 namespace Camera2.HarmonyPatches {
-	[HarmonyPatch(typeof(MultiplayerSessionManager), "UpdateConnectionState")]
+	[HarmonyPatch]
 	static class HookMultiplayer {
-		private static MultiplayerSessionManager _instance;
-		public static MultiplayerSessionManager instance => _instance == null ? null : _instance;
-		static void Postfix(MultiplayerSessionManager __instance) {
+		private static MultiplayerModeSelectionFlowCoordinator _instance;
+		public static MultiplayerModeSelectionFlowCoordinator instance => _instance?._lobbyGameStateController == null ? null : _instance;
+
+		[HarmonyPatch(typeof(MultiplayerModeSelectionFlowCoordinator), nameof(MultiplayerModeSelectionFlowCoordinator.TransitionDidFinish))]
+		static void Postfix(MultiplayerModeSelectionFlowCoordinator __instance) {
 #if DEBUG
-			Plugin.Log.Info($"Multiplayer connection state changed. Connected: {__instance.isConnected}");
+			Plugin.Log.Info($"Multiplayer connection state changed. Connected: {__instance._lobbyGameStateController?.state}");
 #endif
 			_instance = __instance;
 			ScenesManager.ActiveSceneChanged();

@@ -22,7 +22,7 @@ namespace Camera2.Behaviours {
 
 		public void Awake() {
 			hoverMaterial ??= new Material(Shader.Find("Hidden/Internal-DepthNormalsTexture"));
-			normalMaterial ??= new Material(Shader.Find("Standard"));
+			normalMaterial ??= new Material(Resources.FindObjectsOfTypeAll<Material>().FirstOrDefault(m => m.name == "MenuShockwave"));
 
 			DontDestroyOnLoad(gameObject);
 
