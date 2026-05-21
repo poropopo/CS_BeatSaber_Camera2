@@ -26,6 +26,7 @@ namespace Camera2.Behaviours {
 		internal Camera UCamera { get; private set; } = null;
 		internal CameraSettings settings { get; private set; } = null;
 		internal RenderTexture renderTexture { get; private set; } = null;
+		internal RenderTexture windowOutputTexture { get; private set; } = null;
 
 		internal CameraDesktopView previewImage { get; private set; } = null;
 		internal PositionableCam worldCam { get; private set; } = null;
@@ -91,8 +92,34 @@ namespace Camera2.Behaviours {
 			if(previewImage != null && (sizeChanged || previewImage.rekt.anchorMin != settings.viewRect.MinAnchor()))
 				previewImage.SetSource(this);
 
+			UpdateWindowOutputTexture();
 			UpdateDesktopViewActive();
 			UpdateWindowOutput();
+		}
+
+		private void UpdateWindowOutputTexture() {
+			if(!settings.WindowOutput.enabled) {
+				if(windowOutputTexture != null) {
+					windowOutputTexture.Release();
+					windowOutputTexture = null;
+				}
+				return;
+			}
+
+			var width = Configuration.Settings_WindowOutput.FixedWidth;
+			var height = Configuration.Settings_WindowOutput.FixedHeight;
+			if(windowOutputTexture != null && windowOutputTexture.width == width && windowOutputTexture.height == height)
+				return;
+
+			if(windowOutputTexture != null)
+				windowOutputTexture.Release();
+
+			windowOutputTexture = new RenderTexture(width, height, 0) {
+				useMipMap = false,
+				antiAliasing = 1,
+				anisoLevel = 1,
+				useDynamicScale = false
+			};
 		}
 
 		internal void UpdateDesktopViewActive() {
