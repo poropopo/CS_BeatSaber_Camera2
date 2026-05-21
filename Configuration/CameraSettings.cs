@@ -415,8 +415,8 @@ namespace Camera2.Configuration {
 	class Settings_WindowOutput {
 		private readonly CameraSettings settings;
 
-		internal const int FixedWidth = 1920;
-		internal const int FixedHeight = 1080;
+		internal const int DefaultWidth = 1920;
+		internal const int DefaultHeight = 1080;
 
 		internal Settings_WindowOutput(CameraSettings settings) {
 			this.settings = settings;
@@ -424,6 +424,8 @@ namespace Camera2.Configuration {
 
 		private bool _enabled = false;
 		private bool _hideDesktopView = false;
+		private int _width = DefaultWidth;
+		private int _height = DefaultHeight;
 
 		[JsonProperty("enabled")]
 		public bool enabled {
@@ -447,14 +449,28 @@ namespace Camera2.Configuration {
 
 		[JsonProperty("width")]
 		public int width {
-			get => FixedWidth;
-			set { }
+			get => _width;
+			set => SetResolution(value, _height);
 		}
 
 		[JsonProperty("height")]
 		public int height {
-			get => FixedHeight;
-			set { }
+			get => _height;
+			set => SetResolution(_width, value);
+		}
+
+		internal void SetResolution(int width, int height) {
+			width = Math.Max(1, width);
+			height = Math.Max(1, height);
+
+			if(_width == width && _height == height)
+				return;
+
+			_width = width;
+			_height = height;
+
+			if(settings?.isLoaded == true)
+				settings.cam.UpdateRenderTextureAndView();
 		}
 	}
 }
