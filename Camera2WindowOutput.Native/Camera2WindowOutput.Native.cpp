@@ -152,8 +152,8 @@ extern "C" {
 		RegisterWindowClass();
 
 		auto output = std::make_unique<Output>();
-		output->width = width == FixedWidth ? width : FixedWidth;
-		output->height = height == FixedHeight ? height : FixedHeight;
+		output->width = width > 0 ? width : FixedWidth;
+		output->height = height > 0 ? height : FixedHeight;
 
 		RECT rect = { 0, 0, output->width, output->height };
 		AdjustWindowRect(&rect, FixedWindowStyle, FALSE);
@@ -200,7 +200,10 @@ extern "C" {
 			DestroyWindow(output->hwnd);
 	}
 
-	__declspec(dllexport) void __cdecl SetSourceTexture(int handle, void* texture, int, int) {
+	__declspec(dllexport) void __cdecl SetSourceTexture(int handle, void* texture, int width, int height) {
+		(void)width;
+		(void)height;
+
 		std::lock_guard<std::mutex> lock(g_mutex);
 		auto* output = FindOutputLocked(handle);
 		if(!output)
