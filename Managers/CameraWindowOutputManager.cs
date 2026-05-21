@@ -60,13 +60,14 @@ namespace Camera2.Managers {
 
 				SetVisible(state.handle, cam.isActiveAndEnabled);
 
-				if(cam.renderTexture != null) {
-					var texture = cam.renderTexture.GetNativeTexturePtr();
-					if(state.texture != texture || state.width != cam.renderTexture.width || state.height != cam.renderTexture.height) {
-						SetSourceTexture(state.handle, texture, cam.renderTexture.width, cam.renderTexture.height);
+				var sourceTexture = cam.windowOutputTexture;
+				if(sourceTexture != null) {
+					var texture = sourceTexture.GetNativeTexturePtr();
+					if(state.texture != texture || state.width != sourceTexture.width || state.height != sourceTexture.height) {
+						SetSourceTexture(state.handle, texture, sourceTexture.width, sourceTexture.height);
 						state.texture = texture;
-						state.width = cam.renderTexture.width;
-						state.height = cam.renderTexture.height;
+						state.width = sourceTexture.width;
+						state.height = sourceTexture.height;
 					}
 				}
 			} catch(DllNotFoundException ex) {
