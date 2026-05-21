@@ -82,6 +82,7 @@ namespace Camera2.Behaviours {
 
 				UCamera.aspect = (float)w / (float)h;
 				UCamera.targetTexture = renderTexture;
+				UpdateWindowOutputTexture();
 				if(worldCam != null)
 					worldCam.SetSource(this);
 
@@ -273,6 +274,12 @@ namespace Camera2.Behaviours {
 			renderedFrames++;
 #endif
 
+			if(settings.WindowOutput.enabled) {
+				UpdateWindowOutputTexture();
+				if(windowOutputTexture != null)
+					Graphics.Blit(renderTexture, windowOutputTexture, new Vector2(1f, -1f), new Vector2(0f, 1f));
+			}
+
 			CameraWindowOutputManager.Present(this);
 		}
 
@@ -298,6 +305,7 @@ namespace Camera2.Behaviours {
 
 			if(previewImage != null) Destroy(previewImage.gameObject);
 			CameraWindowOutputManager.DestroyCamera(this);
+			if(windowOutputTexture != null) windowOutputTexture.Release();
 			if(shield != null) Destroy(shield.gameObject);
 			Destroy(gameObject);
 		}
