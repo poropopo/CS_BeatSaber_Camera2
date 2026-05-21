@@ -148,6 +148,17 @@ namespace Camera2.UI {
 		internal float renderScale { get => cam.settings.renderScale; set { cam.settings.renderScale = value; } }
 		internal int antiAliasing { get => cam.settings.antiAliasing; set { cam.settings.antiAliasing = value; } }
 		internal float previewSize { get => cam.settings.previewScreenSize; set { cam.settings.previewScreenSize = value; } }
+		internal bool windowOutput_enabled {
+			get => cam.settings.WindowOutput.enabled;
+			set {
+				cam.settings.WindowOutput.enabled = value;
+				NotifyPropertyChanged("windowOutput_hideDesktopView");
+			}
+		}
+		internal bool windowOutput_hideDesktopView {
+			get => cam.settings.WindowOutput.hideDesktopView;
+			set => cam.settings.WindowOutput.hideDesktopView = value;
+		}
 
 		internal float zOffset {
 			get {
