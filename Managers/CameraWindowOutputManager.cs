@@ -11,6 +11,8 @@ namespace Camera2.Managers {
 		private class OutputState {
 			internal int handle;
 			internal IntPtr texture;
+			internal int outputWidth;
+			internal int outputHeight;
 			internal int width;
 			internal int height;
 		}
@@ -50,11 +52,23 @@ namespace Camera2.Managers {
 					return;
 				}
 
-				if(!outputs.TryGetValue(cam, out var state)) {
-					var handle = CreateWindowOutput($"Camera2 - {cam.name}", cam.settings.WindowOutput.width, cam.settings.WindowOutput.height);
+				var outputWidth = cam.settings.WindowOutput.width;
+				var outputHeight = cam.settings.WindowOutput.height;
+
+				if(outputs.TryGetValue(cam, out var state) && (state.outputWidth != outputWidth || state.outputHeight != outputHeight)) {
+					DestroyCamera(cam);
+					state = null;
+				}
+
+				if(state == null) {
+					var handle = CreateWindowOutput($"Camera2 - {cam.name}", outputWidth, outputHeight);
 					if(handle == 0)
 						return;
-					state = new OutputState { handle = handle };
+					state = new OutputState {
+						handle = handle,
+						outputWidth = outputWidth,
+						outputHeight = outputHeight
+					};
 					outputs[cam] = state;
 				}
 
