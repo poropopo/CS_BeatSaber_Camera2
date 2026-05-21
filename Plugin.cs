@@ -77,6 +77,7 @@ namespace Camera2 {
 
 		[OnExit]
 		public void OnApplicationQuit() {
+			CameraWindowOutputManager.Shutdown();
 			harmony.UnpatchSelf();
 		}
 	}
