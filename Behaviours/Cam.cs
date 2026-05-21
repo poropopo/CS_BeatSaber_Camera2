@@ -64,8 +64,8 @@ namespace Camera2.Behaviours {
 
 		internal void UpdateRenderTextureAndView() {
 			var useWindowOutputSize = settings.WindowOutput.enabled;
-			var w = useWindowOutputSize ? Configuration.Settings_WindowOutput.FixedWidth : (int)Math.Round(settings.viewRect.width * Screen.width * settings.renderScale);
-			var h = useWindowOutputSize ? Configuration.Settings_WindowOutput.FixedHeight : (int)Math.Round(settings.viewRect.height * Screen.height * settings.renderScale);
+			var w = useWindowOutputSize ? settings.WindowOutput.width : (int)Math.Round(settings.viewRect.width * Screen.width * settings.renderScale);
+			var h = useWindowOutputSize ? settings.WindowOutput.height : (int)Math.Round(settings.viewRect.height * Screen.height * settings.renderScale);
 
 			var sizeChanged = renderTexture == null || renderTexture.width != w || renderTexture.height != h || renderTexture.antiAliasing != settings.antiAliasing;
 
@@ -107,8 +107,8 @@ namespace Camera2.Behaviours {
 				return;
 			}
 
-			var width = Configuration.Settings_WindowOutput.FixedWidth;
-			var height = Configuration.Settings_WindowOutput.FixedHeight;
+			var width = settings.WindowOutput.width;
+			var height = settings.WindowOutput.height;
 			if(windowOutputTexture != null && windowOutputTexture.width == width && windowOutputTexture.height == height)
 				return;
 
