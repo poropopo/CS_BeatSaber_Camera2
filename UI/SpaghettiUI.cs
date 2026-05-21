@@ -148,6 +148,18 @@ namespace Camera2.UI {
 		internal float renderScale { get => cam.settings.renderScale; set { cam.settings.renderScale = value; } }
 		internal int antiAliasing { get => cam.settings.antiAliasing; set { cam.settings.antiAliasing = value; } }
 		internal float previewSize { get => cam.settings.previewScreenSize; set { cam.settings.previewScreenSize = value; } }
+		internal string windowOutput_resolution {
+			get => $"{cam.settings.WindowOutput.width}x{cam.settings.WindowOutput.height}";
+			set {
+				var parts = value.Split('x');
+				if(parts.Length != 2 || !int.TryParse(parts[0], out var width) || !int.TryParse(parts[1], out var height)) {
+					NotifyPropertyChanged("windowOutput_resolution");
+					return;
+				}
+
+				cam.settings.WindowOutput.SetResolution(width, height);
+			}
+		}
 		internal bool windowOutput_enabled {
 			get => cam.settings.WindowOutput.enabled;
 			set {
@@ -347,6 +359,7 @@ namespace Camera2.UI {
 
 		private static readonly List<object> types = new List<object> { CameraType.FirstPerson, CameraType.Positionable };
 		private static readonly List<object> antiAliasingLevels = new List<object> { 1, 2, 4, 8 };
+		private static readonly List<object> windowOutput_resolutions = new List<object> { "1280x720", "1920x1080", "2560x1440", "3840x2160" };
 		private static readonly List<object> worldCamVisibilities = Enum.GetValues(typeof(WorldCamVisibility)).Cast<object>().ToList();
 		private static readonly List<object> visibilities_Walls = Enum.GetValues(typeof(WallVisiblity)).Cast<object>().ToList();
 		private static readonly List<object> visibilities_Notes = Enum.GetValues(typeof(NoteVisibility)).Cast<object>().ToList();
