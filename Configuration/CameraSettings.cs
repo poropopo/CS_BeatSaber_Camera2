@@ -108,6 +108,7 @@ namespace Camera2.Configuration {
 			Follow360 = CameraSubSettings.GetFor<Settings_Follow360>(this);
 			VMCProtocol = CameraSubSettings.GetFor<Settings_VMCAvatar>(this);
 			PostProcessing = CameraSubSettings.GetFor<Settings_PostProcessing>(this);
+			WindowOutput = new Settings_WindowOutput(this);
 		}
 
 		public void Load(bool loadConfig = true) {
@@ -131,6 +132,7 @@ namespace Camera2.Configuration {
 			ApplyPositionAndRotation();
 			ApplyLayerBitmask();
 			cam.UpdateRenderTextureAndView();
+			cam.UpdateWindowOutput();
 			cam.ShowWorldCamIfNecessary();
 			isLoaded = true;
 		}
@@ -389,6 +391,8 @@ namespace Camera2.Configuration {
 		public Settings_VMCAvatar VMCProtocol { get; private set; }
 		public Settings_FPSLimiter FPSLimiter { get; private set; }
 		public Settings_PostProcessing PostProcessing { get; private set; }
+		[JsonProperty("windowOutput")]
+		public Settings_WindowOutput WindowOutput { get; private set; }
 
 		public bool ShouldSerializeFollow360() => type == CameraType.Positionable;
 		public bool ShouldSerializeSmoothfollow() => type != CameraType.Positionable;
@@ -405,5 +409,52 @@ namespace Camera2.Configuration {
 		public Settings_MovementScript MovementScript { get; private set; } = new Settings_MovementScript();
 
 		public bool ShouldSerializeMovementScript() => type != CameraType.FirstPerson;
+	}
+
+	[JsonObject(MemberSerialization.OptIn)]
+	class Settings_WindowOutput {
+		private readonly CameraSettings settings;
+
+		internal const int FixedWidth = 1920;
+		internal const int FixedHeight = 1080;
+
+		internal Settings_WindowOutput(CameraSettings settings) {
+			this.settings = settings;
+		}
+
+		private bool _enabled = false;
+		private bool _hideDesktopView = false;
+
+		[JsonProperty("enabled")]
+		public bool enabled {
+			get => _enabled;
+			set {
+				_enabled = value;
+				if(settings?.isLoaded == true)
+					settings.cam.UpdateRenderTextureAndView();
+			}
+		}
+
+		[JsonProperty("hideDesktopView")]
+		public bool hideDesktopView {
+			get => _hideDesktopView;
+			set {
+				_hideDesktopView = value;
+				if(settings?.isLoaded == true)
+					settings.cam.UpdateDesktopViewActive();
+			}
+		}
+
+		[JsonProperty("width")]
+		public int width {
+			get => FixedWidth;
+			set { }
+		}
+
+		[JsonProperty("height")]
+		public int height {
+			get => FixedHeight;
+			set { }
+		}
 	}
 }
