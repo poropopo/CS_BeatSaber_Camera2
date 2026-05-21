@@ -364,7 +364,7 @@ namespace Camera2.UI {
 
 		private static readonly List<object> types = new List<object> { CameraType.FirstPerson, CameraType.Positionable };
 		private static readonly List<object> antiAliasingLevels = new List<object> { 1, 2, 4, 8 };
-		private static readonly List<object> windowOutput_resolutions = new List<object> { "1280x720", "1920x1080", "2560x1440", "3840x2160" };
+		private static readonly List<object> windowOutput_resolutions = new List<object> { "854x480", "1280x720", "1920x1080", "2560x1440", "3840x2160" };
 		private static readonly List<object> worldCamVisibilities = Enum.GetValues(typeof(WorldCamVisibility)).Cast<object>().ToList();
 		private static readonly List<object> visibilities_Walls = Enum.GetValues(typeof(WallVisiblity)).Cast<object>().ToList();
 		private static readonly List<object> visibilities_Notes = Enum.GetValues(typeof(NoteVisibility)).Cast<object>().ToList();
