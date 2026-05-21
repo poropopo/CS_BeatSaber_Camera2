@@ -17,6 +17,8 @@ namespace Camera2.Configuration {
 				targetFrameTime = value != 0f ? 1f / value : 0f;
 
 				GlobalFPSCap.ApplyFPSCap();
+				if(settings?.isLoaded == true)
+					settings.cam.UpdateWindowOutput();
 			}
 		}
 	}

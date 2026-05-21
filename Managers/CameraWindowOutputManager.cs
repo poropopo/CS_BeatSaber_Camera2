@@ -10,6 +10,7 @@ namespace Camera2.Managers {
 
 		private class OutputState {
 			internal int handle;
+			internal string title;
 			internal IntPtr texture;
 			internal int outputWidth;
 			internal int outputHeight;
@@ -33,6 +34,9 @@ namespace Camera2.Managers {
 		[DllImport(NativeDll, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void SetVisible(int handle, [MarshalAs(UnmanagedType.I1)] bool visible);
 
+		[DllImport(NativeDll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+		private static extern void SetWindowTitle(int handle, string title);
+
 		[DllImport(NativeDll, CallingConvention = CallingConvention.Cdecl)]
 		[return: MarshalAs(UnmanagedType.I1)]
 		private static extern bool IsCloseRequested(int handle);
@@ -54,6 +58,7 @@ namespace Camera2.Managers {
 
 				var outputWidth = cam.settings.WindowOutput.width;
 				var outputHeight = cam.settings.WindowOutput.height;
+				var title = GetWindowTitle(cam);
 
 				if(outputs.TryGetValue(cam, out var state) && (state.outputWidth != outputWidth || state.outputHeight != outputHeight)) {
 					DestroyCamera(cam);
@@ -61,15 +66,19 @@ namespace Camera2.Managers {
 				}
 
 				if(state == null) {
-					var handle = CreateWindowOutput($"Camera2 - {cam.name}", outputWidth, outputHeight);
+					var handle = CreateWindowOutput(title, outputWidth, outputHeight);
 					if(handle == 0)
 						return;
 					state = new OutputState {
 						handle = handle,
+						title = title,
 						outputWidth = outputWidth,
 						outputHeight = outputHeight
 					};
 					outputs[cam] = state;
+				} else if(state.title != title) {
+					SetWindowTitle(state.handle, title);
+					state.title = title;
 				}
 
 				SetVisible(state.handle, cam.isActiveAndEnabled);
@@ -94,6 +103,12 @@ namespace Camera2.Managers {
 				Plugin.Log.Error($"Failed to update separate window output for {cam.name}:");
 				Plugin.Log.Error(ex);
 			}
+		}
+
+		private static string GetWindowTitle(Cam2 cam) {
+			var fpsLimit = cam.settings.FPSLimiter.fpsLimit;
+			var fpsText = fpsLimit > 0 ? $"{fpsLimit} FPS" : "FPS uncapped";
+			return $"Camera2 - {cam.name} ({cam.settings.WindowOutput.width}x{cam.settings.WindowOutput.height}, {fpsText}, AA {cam.settings.antiAliasing}x)";
 		}
 
 		internal static void Present(Cam2 cam) {

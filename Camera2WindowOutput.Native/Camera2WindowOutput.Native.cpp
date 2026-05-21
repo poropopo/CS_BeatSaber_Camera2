@@ -501,6 +501,28 @@ extern "C" {
 		}, false);
 	}
 
+	__declspec(dllexport) void __cdecl SetWindowTitle(int handle, const wchar_t* title) {
+		std::shared_ptr<Output> output;
+		{
+			std::lock_guard<std::mutex> lock(g_mutex);
+			output = FindOutputRefLocked(handle);
+			if(!output)
+				return;
+		}
+
+		const std::wstring windowTitle = title == nullptr ? L"Camera2" : title;
+		PostUiTask([output, windowTitle] {
+			HWND hwnd = nullptr;
+			{
+				std::lock_guard<std::mutex> lock(g_mutex);
+				hwnd = output->hwnd;
+			}
+
+			if(hwnd)
+				SetWindowTextW(hwnd, windowTitle.c_str());
+		}, false);
+	}
+
 	__declspec(dllexport) bool __cdecl IsCloseRequested(int handle) {
 		std::lock_guard<std::mutex> lock(g_mutex);
 		auto* output = FindOutputLocked(handle);

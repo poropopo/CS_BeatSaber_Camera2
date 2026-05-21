@@ -183,6 +183,7 @@ namespace Camera2.Managers {
 			cam.settings.Save();
 			File.Move(cam.configPath, ConfigUtil.GetCameraPath(newName));
 			cam.Init(newName, rename: true);
+			cam.UpdateWindowOutput();
 			ScenesManager.settings.Save();
 
 			return true;
