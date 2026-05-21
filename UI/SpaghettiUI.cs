@@ -104,6 +104,11 @@ namespace Camera2.UI {
 		[UIComponent("viewRectTab")] internal Tab viewRectTab = null;
 		[UIComponent("tabSelector")] TabSelector tabSelector = null;
 
+		private const int SettingsTabColumns = 6;
+		private const float SettingsTabFallbackWidth = 100f;
+		private const float SettingsTabFallbackRowHeight = 8f;
+		private float settingsTabRowHeight = SettingsTabFallbackRowHeight;
+
 		internal static Cam2 cam { get; private set; }
 
 		static string[] props;
@@ -440,6 +445,7 @@ namespace Camera2.UI {
 			viewRectTab.IsVisible = false;
 
 			Coordinator.instance.ShowSettingsForCam(CamManager.cams.Values.First());
+			FormatSettingsTabBar();
 		}
 
 		private void ToggleSettingVisibility() {
@@ -457,6 +463,73 @@ namespace Camera2.UI {
 			// Apparently this is the best possible way to programmatically switch the selected tab
 			tabSelector.TextSegmentedControl.SelectCellWithNumber(0);
 			AccessTools.Method(typeof(TabSelector), "TabSelected").Invoke(tabSelector, new object[] { tabSelector.TextSegmentedControl, 0 });
+
+			FormatSettingsTabBar();
+		}
+
+		internal void FormatSettingsTabBar() {
+			if(tabSelector?.TextSegmentedControl == null)
+				return;
+
+			var control = tabSelector.TextSegmentedControl;
+			var controlTransform = control.transform as UnityEngine.RectTransform;
+			if(controlTransform == null)
+				return;
+
+			foreach(var layoutGroup in control.GetComponents<LayoutGroup>()) {
+				if(layoutGroup is GridLayoutGroup)
+					continue;
+
+				UnityEngine.Object.DestroyImmediate(layoutGroup);
+			}
+
+			var visibleCellCount = 0;
+			for(var i = 0; i < controlTransform.childCount; i++) {
+				var child = controlTransform.GetChild(i);
+				if(child.gameObject.activeSelf)
+					visibleCellCount++;
+			}
+
+			if(visibleCellCount == 0)
+				visibleCellCount = controlTransform.childCount;
+
+			var rows = visibleCellCount > SettingsTabColumns ? 2 : 1;
+			var spacing = UnityEngine.Vector2.zero;
+			var availableWidth = controlTransform.rect.width;
+			if(availableWidth <= 0f) {
+				var parentTransform = controlTransform.parent as UnityEngine.RectTransform;
+				availableWidth = parentTransform != null && parentTransform.rect.width > 0f
+					? parentTransform.rect.width
+					: SettingsTabFallbackWidth;
+			}
+
+			var existingGridLayout = control.GetComponent<GridLayoutGroup>();
+			var layoutElement = control.GetComponent<LayoutElement>() ?? control.gameObject.AddComponent<LayoutElement>();
+			if(existingGridLayout == null) {
+				if(layoutElement.preferredHeight > 0f)
+					settingsTabRowHeight = layoutElement.preferredHeight;
+				else if(controlTransform.rect.height > 0f)
+					settingsTabRowHeight = controlTransform.rect.height;
+			}
+			settingsTabRowHeight = UnityEngine.Mathf.Max(SettingsTabFallbackRowHeight, settingsTabRowHeight);
+
+			var gridLayout = existingGridLayout ?? control.gameObject.AddComponent<GridLayoutGroup>();
+			if(gridLayout == null)
+				return;
+
+			gridLayout.enabled = true;
+			gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+			gridLayout.constraintCount = SettingsTabColumns;
+			gridLayout.spacing = spacing;
+			gridLayout.cellSize = new UnityEngine.Vector2(
+				(availableWidth - spacing.x * (SettingsTabColumns - 1)) / SettingsTabColumns,
+				settingsTabRowHeight
+			);
+
+			layoutElement.preferredWidth = availableWidth;
+			layoutElement.preferredHeight = settingsTabRowHeight * rows + spacing.y * (rows - 1);
+
+			LayoutRebuilder.ForceRebuildLayoutImmediate(controlTransform);
 		}
 	}
 
@@ -621,7 +694,10 @@ namespace Camera2.UI {
 		void LayerIncrease() => ChangeLayer(1);
 		void LayerDecrease() => ChangeLayer(-1);
 
-		void UnlockCamPosTab() => Coordinator.instance.settingsView.viewRectTab.IsVisible = true;
+		void UnlockCamPosTab() {
+			Coordinator.instance.settingsView.viewRectTab.IsVisible = true;
+			Coordinator.instance.settingsView.FormatSettingsTabBar();
+		}
 
 		void ShowGithub() => Process.Start("https://github.com/kinsi55/CS_BeatSaber_Camera2");
 		void ShowWiki() => Process.Start("https://github.com/kinsi55/CS_BeatSaber_Camera2/wiki");
