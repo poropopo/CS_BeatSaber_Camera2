@@ -4,6 +4,7 @@ using Camera2.Configuration;
 using Camera2.HarmonyPatches;
 using Camera2.Interfaces;
 using Camera2.Middlewares;
+using Camera2.Managers;
 using Camera2.UI;
 using Camera2.Utils;
 using System;
@@ -61,8 +62,9 @@ namespace Camera2.Behaviours {
 
 
 		internal void UpdateRenderTextureAndView() {
-			var w = (int)Math.Round(settings.viewRect.width * Screen.width * settings.renderScale);
-			var h = (int)Math.Round(settings.viewRect.height * Screen.height * settings.renderScale);
+			var useWindowOutputSize = settings.WindowOutput.enabled;
+			var w = useWindowOutputSize ? Configuration.Settings_WindowOutput.FixedWidth : (int)Math.Round(settings.viewRect.width * Screen.width * settings.renderScale);
+			var h = useWindowOutputSize ? Configuration.Settings_WindowOutput.FixedHeight : (int)Math.Round(settings.viewRect.height * Screen.height * settings.renderScale);
 
 			var sizeChanged = renderTexture == null || renderTexture.width != w || renderTexture.height != h || renderTexture.antiAliasing != settings.antiAliasing;
 
@@ -83,10 +85,23 @@ namespace Camera2.Behaviours {
 					worldCam.SetSource(this);
 
 				PrepareMiddlewaredRender(true);
+				UpdateWindowOutput();
 			}
 
 			if(previewImage != null && (sizeChanged || previewImage.rekt.anchorMin != settings.viewRect.MinAnchor()))
 				previewImage.SetSource(this);
+
+			UpdateDesktopViewActive();
+			UpdateWindowOutput();
+		}
+
+		internal void UpdateDesktopViewActive() {
+			if(previewImage != null)
+				previewImage.gameObject.SetActive(isActiveAndEnabled && (!settings.WindowOutput.enabled || !settings.WindowOutput.hideDesktopView));
+		}
+
+		internal void UpdateWindowOutput() {
+			CameraWindowOutputManager.UpdateCamera(this);
 		}
 
 		internal void ShowWorldCamIfNecessary() {
@@ -230,19 +245,21 @@ namespace Camera2.Behaviours {
 #if FPSCOUNT
 			renderedFrames++;
 #endif
+
+			CameraWindowOutputManager.Present(this);
 		}
 
 		private void OnEnable() {
 			// Force a render here so we dont end up with a stale image after having just enabled this camera
 			PrepareMiddlewaredRender(true);
-			if(previewImage != null)
-				previewImage.gameObject.SetActive(true);
+			UpdateDesktopViewActive();
+			UpdateWindowOutput();
 			ShowWorldCamIfNecessary();
 		}
 
 		private void OnDisable() {
-			if(previewImage != null)
-				previewImage.gameObject.SetActive(false);
+			UpdateDesktopViewActive();
+			UpdateWindowOutput();
 
 			ShowWorldCamIfNecessary();
 		}
@@ -253,6 +270,7 @@ namespace Camera2.Behaviours {
 			gameObject.SetActive(false);
 
 			if(previewImage != null) Destroy(previewImage.gameObject);
+			CameraWindowOutputManager.DestroyCamera(this);
 			if(shield != null) Destroy(shield.gameObject);
 			Destroy(gameObject);
 		}
