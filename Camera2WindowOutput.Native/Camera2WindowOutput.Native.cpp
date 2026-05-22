@@ -815,9 +815,7 @@ extern "C" {
 			output->visible = false;
 			output->closeRequested = true;
 			output->source.Reset();
-			output->device.Reset();
-			output->context.Reset();
-			output->swapChain.Reset();
+			ResetD3DResources(*output, true);
 			g_outputs.erase(it);
 		}
 
@@ -846,9 +844,7 @@ extern "C" {
 			return;
 
 		output->source.Reset();
-		output->device.Reset();
-		output->context.Reset();
-		output->swapChain.Reset();
+		ResetD3DResources(*output, true);
 
 		if(texture)
 			reinterpret_cast<ID3D11Texture2D*>(texture)->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void**>(output->source.GetAddressOf()));
