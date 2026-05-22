@@ -26,7 +26,6 @@ namespace Camera2.Behaviours {
 		internal Camera UCamera { get; private set; } = null;
 		internal CameraSettings settings { get; private set; } = null;
 		internal RenderTexture renderTexture { get; private set; } = null;
-		internal RenderTexture windowOutputTexture { get; private set; } = null;
 
 		internal CameraDesktopView previewImage { get; private set; } = null;
 		internal PositionableCam worldCam { get; private set; } = null;
@@ -82,7 +81,6 @@ namespace Camera2.Behaviours {
 
 				UCamera.aspect = (float)w / (float)h;
 				UCamera.targetTexture = renderTexture;
-				UpdateWindowOutputTexture();
 				if(worldCam != null)
 					worldCam.SetSource(this);
 
@@ -93,34 +91,8 @@ namespace Camera2.Behaviours {
 			if(previewImage != null && (sizeChanged || previewImage.rekt.anchorMin != settings.viewRect.MinAnchor()))
 				previewImage.SetSource(this);
 
-			UpdateWindowOutputTexture();
 			UpdateDesktopViewActive();
 			UpdateWindowOutput();
-		}
-
-		private void UpdateWindowOutputTexture() {
-			if(!settings.WindowOutput.enabled) {
-				if(windowOutputTexture != null) {
-					windowOutputTexture.Release();
-					windowOutputTexture = null;
-				}
-				return;
-			}
-
-			var width = settings.WindowOutput.width;
-			var height = settings.WindowOutput.height;
-			if(windowOutputTexture != null && windowOutputTexture.width == width && windowOutputTexture.height == height)
-				return;
-
-			if(windowOutputTexture != null)
-				windowOutputTexture.Release();
-
-			windowOutputTexture = new RenderTexture(width, height, 0) {
-				useMipMap = false,
-				antiAliasing = 1,
-				anisoLevel = 1,
-				useDynamicScale = false
-			};
 		}
 
 		internal void UpdateDesktopViewActive() {
@@ -274,12 +246,6 @@ namespace Camera2.Behaviours {
 			renderedFrames++;
 #endif
 
-			if(settings.WindowOutput.enabled) {
-				UpdateWindowOutputTexture();
-				if(windowOutputTexture != null)
-					Graphics.Blit(renderTexture, windowOutputTexture, new Vector2(1f, -1f), new Vector2(0f, 1f));
-			}
-
 			CameraWindowOutputManager.Present(this);
 		}
 
@@ -305,7 +271,6 @@ namespace Camera2.Behaviours {
 
 			if(previewImage != null) Destroy(previewImage.gameObject);
 			CameraWindowOutputManager.DestroyCamera(this);
-			if(windowOutputTexture != null) windowOutputTexture.Release();
 			if(shield != null) Destroy(shield.gameObject);
 			Destroy(gameObject);
 		}

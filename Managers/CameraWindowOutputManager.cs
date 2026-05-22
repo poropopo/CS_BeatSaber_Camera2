@@ -83,7 +83,7 @@ namespace Camera2.Managers {
 
 				SetVisible(state.handle, cam.isActiveAndEnabled);
 
-				var sourceTexture = cam.windowOutputTexture;
+				var sourceTexture = cam.renderTexture;
 				if(sourceTexture != null) {
 					var texture = sourceTexture.GetNativeTexturePtr();
 					if(state.texture != texture || state.width != sourceTexture.width || state.height != sourceTexture.height) {
