@@ -1,8 +1,10 @@
 #include <Windows.h>
 #include <d3d11.h>
+#include <d3dcompiler.h>
 #include <dxgi.h>
 #include <condition_variable>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <functional>
 #include <future>
@@ -39,6 +41,24 @@ namespace {
 		ComPtr<ID3D11Device> device;
 		ComPtr<ID3D11DeviceContext> context;
 		ComPtr<IDXGISwapChain> swapChain;
+		ComPtr<ID3D11RenderTargetView> renderTargetView;
+		ComPtr<ID3D11ShaderResourceView> sourceView;
+		ComPtr<ID3D11VertexShader> vertexShader;
+		ComPtr<ID3D11PixelShader> pixelShader;
+		ComPtr<ID3D11PixelShader> pixelShaderMSAA2;
+		ComPtr<ID3D11PixelShader> pixelShaderMSAA4;
+		ComPtr<ID3D11PixelShader> pixelShaderMSAA8;
+		ComPtr<ID3D11SamplerState> sampler;
+		ComPtr<ID3D11Buffer> pixelConstants;
+		UINT sourceSampleCount = 1;
+		UINT sourceWidth = 0;
+		UINT sourceHeight = 0;
+	};
+
+	struct PixelConstants {
+		float sourceSize[2] = {};
+		UINT sampleCount = 1;
+		UINT padding = 0;
 	};
 
 	std::mutex g_mutex;
@@ -66,6 +86,218 @@ namespace {
 	std::shared_ptr<Output> FindOutputRefLocked(int handle) {
 		auto it = g_outputs.find(handle);
 		return it == g_outputs.end() ? nullptr : it->second;
+	}
+
+	void ResetD3DResources(Output& output, bool resetSwapChain) {
+		output.renderTargetView.Reset();
+		output.sourceView.Reset();
+		output.vertexShader.Reset();
+		output.pixelShader.Reset();
+		output.pixelShaderMSAA2.Reset();
+		output.pixelShaderMSAA4.Reset();
+		output.pixelShaderMSAA8.Reset();
+		output.sampler.Reset();
+		output.pixelConstants.Reset();
+		if(resetSwapChain)
+			output.swapChain.Reset();
+		output.context.Reset();
+		output.device.Reset();
+		output.sourceSampleCount = 1;
+		output.sourceWidth = 0;
+		output.sourceHeight = 0;
+	}
+
+	DXGI_FORMAT ToShaderResourceFormat(DXGI_FORMAT format) {
+		switch(format) {
+			case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+				return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+				return DXGI_FORMAT_B8G8R8A8_UNORM;
+			case DXGI_FORMAT_B8G8R8X8_TYPELESS:
+				return DXGI_FORMAT_B8G8R8X8_UNORM;
+			case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+				return DXGI_FORMAT_R16G16B16A16_FLOAT;
+			case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+				return DXGI_FORMAT_R10G10B10A2_UNORM;
+			default:
+				return format;
+		}
+	}
+
+	bool CompileShader(const char* source, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& shader) {
+		UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined(_DEBUG)
+		flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+
+		ComPtr<ID3DBlob> errors;
+		return SUCCEEDED(D3DCompile(
+			source,
+			strlen(source),
+			nullptr,
+			nullptr,
+			nullptr,
+			entryPoint,
+			target,
+			flags,
+			0,
+			shader.GetAddressOf(),
+			errors.GetAddressOf()
+		));
+	}
+
+	const char* WindowOutputShaderSource = R"(
+		struct VSOutput {
+			float4 position : SV_Position;
+			float2 uv : TEXCOORD0;
+		};
+
+		cbuffer PixelConstants : register(b0) {
+			float2 sourceSize;
+			uint sampleCount;
+			uint padding;
+		};
+
+		Texture2D sourceTexture : register(t0);
+		Texture2DMS<float4, 2> sourceTextureMSAA2 : register(t1);
+		Texture2DMS<float4, 4> sourceTextureMSAA4 : register(t2);
+		Texture2DMS<float4, 8> sourceTextureMSAA8 : register(t3);
+		SamplerState sourceSampler : register(s0);
+
+		VSOutput VS(uint id : SV_VertexID) {
+			float2 uv = float2((id << 1) & 2, id & 2);
+			VSOutput output;
+			output.position = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, 0.0f, 1.0f);
+			output.uv = float2(uv.x, 1.0f - uv.y);
+			return output;
+		}
+
+		float4 PS(VSOutput input) : SV_Target {
+			uint2 coord = min(uint2(input.uv * sourceSize), uint2(sourceSize) - uint2(1, 1));
+			return sourceTexture.Load(int3(coord, 0));
+		}
+
+		float4 PSMSAA2(VSOutput input) : SV_Target {
+			uint2 coord = min(uint2(input.uv * sourceSize), uint2(sourceSize) - uint2(1, 1));
+			return (sourceTextureMSAA2.Load(coord, 0) + sourceTextureMSAA2.Load(coord, 1)) / 2.0f;
+		}
+
+		float4 PSMSAA4(VSOutput input) : SV_Target {
+			uint2 coord = min(uint2(input.uv * sourceSize), uint2(sourceSize) - uint2(1, 1));
+			float4 color =
+				sourceTextureMSAA4.Load(coord, 0) +
+				sourceTextureMSAA4.Load(coord, 1) +
+				sourceTextureMSAA4.Load(coord, 2) +
+				sourceTextureMSAA4.Load(coord, 3);
+			return color / 4.0f;
+		}
+
+		float4 PSMSAA8(VSOutput input) : SV_Target {
+			uint2 coord = min(uint2(input.uv * sourceSize), uint2(sourceSize) - uint2(1, 1));
+			float4 color =
+				sourceTextureMSAA8.Load(coord, 0) +
+				sourceTextureMSAA8.Load(coord, 1) +
+				sourceTextureMSAA8.Load(coord, 2) +
+				sourceTextureMSAA8.Load(coord, 3) +
+				sourceTextureMSAA8.Load(coord, 4) +
+				sourceTextureMSAA8.Load(coord, 5) +
+				sourceTextureMSAA8.Load(coord, 6) +
+				sourceTextureMSAA8.Load(coord, 7);
+			return color / 8.0f;
+		}
+	)";
+
+	bool EnsureDeviceResources(Output& output) {
+		if(!output.source)
+			return false;
+
+		if(!output.device) {
+			output.source->GetDevice(output.device.GetAddressOf());
+			if(output.device)
+				output.device->GetImmediateContext(output.context.GetAddressOf());
+		}
+
+		if(!output.device || !output.context)
+			return false;
+
+		if(!output.vertexShader) {
+			ComPtr<ID3DBlob> vertexShaderBlob;
+			if(!CompileShader(WindowOutputShaderSource, "VS", "vs_4_0", vertexShaderBlob) ||
+			   FAILED(output.device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, output.vertexShader.GetAddressOf())))
+				return false;
+		}
+
+		if(!output.pixelShader) {
+			ComPtr<ID3DBlob> pixelShaderBlob;
+			if(!CompileShader(WindowOutputShaderSource, "PS", "ps_4_0", pixelShaderBlob) ||
+			   FAILED(output.device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, output.pixelShader.GetAddressOf())))
+				return false;
+		}
+
+		if(!output.pixelShaderMSAA2) {
+			ComPtr<ID3DBlob> pixelShaderBlob;
+			if(!CompileShader(WindowOutputShaderSource, "PSMSAA2", "ps_4_0", pixelShaderBlob) ||
+			   FAILED(output.device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, output.pixelShaderMSAA2.GetAddressOf())))
+				return false;
+		}
+
+		if(!output.pixelShaderMSAA4) {
+			ComPtr<ID3DBlob> pixelShaderBlob;
+			if(!CompileShader(WindowOutputShaderSource, "PSMSAA4", "ps_4_0", pixelShaderBlob) ||
+			   FAILED(output.device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, output.pixelShaderMSAA4.GetAddressOf())))
+				return false;
+		}
+
+		if(!output.pixelShaderMSAA8) {
+			ComPtr<ID3DBlob> pixelShaderBlob;
+			if(!CompileShader(WindowOutputShaderSource, "PSMSAA8", "ps_4_0", pixelShaderBlob) ||
+			   FAILED(output.device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, output.pixelShaderMSAA8.GetAddressOf())))
+				return false;
+		}
+
+		if(!output.sampler) {
+			D3D11_SAMPLER_DESC desc = {};
+			desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+			desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+			desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+			desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+			desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+			desc.MinLOD = 0.0f;
+			desc.MaxLOD = D3D11_FLOAT32_MAX;
+			if(FAILED(output.device->CreateSamplerState(&desc, output.sampler.GetAddressOf())))
+				return false;
+		}
+
+		if(!output.pixelConstants) {
+			D3D11_BUFFER_DESC desc = {};
+			desc.ByteWidth = sizeof(PixelConstants);
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			if(FAILED(output.device->CreateBuffer(&desc, nullptr, output.pixelConstants.GetAddressOf())))
+				return false;
+		}
+
+		if(!output.sourceView) {
+			D3D11_TEXTURE2D_DESC sourceDesc = {};
+			output.source->GetDesc(&sourceDesc);
+			output.sourceWidth = sourceDesc.Width;
+			output.sourceHeight = sourceDesc.Height;
+			output.sourceSampleCount = sourceDesc.SampleDesc.Count == 0 ? 1 : sourceDesc.SampleDesc.Count;
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc = {};
+			viewDesc.Format = ToShaderResourceFormat(sourceDesc.Format);
+			if(output.sourceSampleCount > 1) {
+				viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
+			} else {
+				viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+				viewDesc.Texture2D.MipLevels = 1;
+			}
+
+			if(FAILED(output.device->CreateShaderResourceView(output.source.Get(), &viewDesc, output.sourceView.GetAddressOf())))
+				return false;
+		}
+
+		return true;
 	}
 
 	LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
