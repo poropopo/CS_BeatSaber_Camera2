@@ -554,6 +554,166 @@ namespace {
 			StopUiThread();
 	}
 
+	bool EnsureRenderTargetView(Output& output) {
+		if(output.renderTargetView)
+			return true;
+
+		if(!CreateSwapChain(output))
+			return false;
+
+		ComPtr<ID3D11Texture2D> backBuffer;
+		if(FAILED(output.swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()))))
+			return false;
+
+		return SUCCEEDED(output.device->CreateRenderTargetView(backBuffer.Get(), nullptr, output.renderTargetView.GetAddressOf()));
+	}
+
+	struct SavedPipelineState {
+		ID3D11InputLayout* inputLayout = nullptr;
+		D3D11_PRIMITIVE_TOPOLOGY primitiveTopology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+		ID3D11Buffer* vertexBuffer = nullptr;
+		UINT vertexStride = 0;
+		UINT vertexOffset = 0;
+		ID3D11VertexShader* vertexShader = nullptr;
+		ID3D11PixelShader* pixelShader = nullptr;
+		ID3D11ShaderResourceView* pixelShaderResources[4] = {};
+		ID3D11SamplerState* pixelSampler = nullptr;
+		ID3D11Buffer* pixelConstantBuffer = nullptr;
+		ID3D11RasterizerState* rasterizerState = nullptr;
+		UINT viewportCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+		D3D11_VIEWPORT viewports[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE] = {};
+		UINT scissorCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+		D3D11_RECT scissors[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE] = {};
+		ID3D11RenderTargetView* renderTargetView = nullptr;
+		ID3D11DepthStencilView* depthStencilView = nullptr;
+		ID3D11BlendState* blendState = nullptr;
+		FLOAT blendFactor[4] = {};
+		UINT sampleMask = 0;
+		ID3D11DepthStencilState* depthStencilState = nullptr;
+		UINT stencilRef = 0;
+
+		void Capture(ID3D11DeviceContext* context) {
+			context->IAGetInputLayout(&inputLayout);
+			context->IAGetPrimitiveTopology(&primitiveTopology);
+			context->IAGetVertexBuffers(0, 1, &vertexBuffer, &vertexStride, &vertexOffset);
+			context->VSGetShader(&vertexShader, nullptr, nullptr);
+			context->PSGetShader(&pixelShader, nullptr, nullptr);
+			context->PSGetShaderResources(0, 4, pixelShaderResources);
+			context->PSGetSamplers(0, 1, &pixelSampler);
+			context->PSGetConstantBuffers(0, 1, &pixelConstantBuffer);
+			context->RSGetState(&rasterizerState);
+			context->RSGetViewports(&viewportCount, viewports);
+			context->RSGetScissorRects(&scissorCount, scissors);
+			context->OMGetRenderTargets(1, &renderTargetView, &depthStencilView);
+			context->OMGetBlendState(&blendState, blendFactor, &sampleMask);
+			context->OMGetDepthStencilState(&depthStencilState, &stencilRef);
+		}
+
+		void Restore(ID3D11DeviceContext* context) {
+			ID3D11Buffer* vertexBuffers[1] = { vertexBuffer };
+			ID3D11SamplerState* pixelSamplers[1] = { pixelSampler };
+			ID3D11Buffer* pixelConstantBuffers[1] = { pixelConstantBuffer };
+			ID3D11RenderTargetView* renderTargetViews[1] = { renderTargetView };
+
+			context->IASetInputLayout(inputLayout);
+			context->IASetPrimitiveTopology(primitiveTopology);
+			context->IASetVertexBuffers(0, 1, vertexBuffers, &vertexStride, &vertexOffset);
+			context->VSSetShader(vertexShader, nullptr, 0);
+			context->PSSetShader(pixelShader, nullptr, 0);
+			context->PSSetShaderResources(0, 4, pixelShaderResources);
+			context->PSSetSamplers(0, 1, pixelSamplers);
+			context->PSSetConstantBuffers(0, 1, pixelConstantBuffers);
+			context->RSSetState(rasterizerState);
+			context->RSSetViewports(viewportCount, viewports);
+			context->RSSetScissorRects(scissorCount, scissors);
+			context->OMSetRenderTargets(1, renderTargetViews, depthStencilView);
+			context->OMSetBlendState(blendState, blendFactor, sampleMask);
+			context->OMSetDepthStencilState(depthStencilState, stencilRef);
+
+			if(inputLayout) inputLayout->Release();
+			if(vertexBuffer) vertexBuffer->Release();
+			if(vertexShader) vertexShader->Release();
+			if(pixelShader) pixelShader->Release();
+			if(pixelShaderResources[0]) pixelShaderResources[0]->Release();
+			if(pixelShaderResources[1]) pixelShaderResources[1]->Release();
+			if(pixelShaderResources[2]) pixelShaderResources[2]->Release();
+			if(pixelShaderResources[3]) pixelShaderResources[3]->Release();
+			if(pixelSampler) pixelSampler->Release();
+			if(pixelConstantBuffer) pixelConstantBuffer->Release();
+			if(rasterizerState) rasterizerState->Release();
+			if(renderTargetView) renderTargetView->Release();
+			if(depthStencilView) depthStencilView->Release();
+			if(blendState) blendState->Release();
+			if(depthStencilState) depthStencilState->Release();
+		}
+	};
+
+	bool RenderOutput(Output& output) {
+		if(!EnsureDeviceResources(output) || !EnsureRenderTargetView(output))
+			return false;
+
+		PixelConstants constants = {};
+		constants.sourceSize[0] = static_cast<float>(output.sourceWidth);
+		constants.sourceSize[1] = static_cast<float>(output.sourceHeight);
+		constants.sampleCount = output.sourceSampleCount;
+		output.context->UpdateSubresource(output.pixelConstants.Get(), 0, nullptr, &constants, 0, 0);
+
+		SavedPipelineState savedState;
+		savedState.Capture(output.context.Get());
+
+		UINT stride = 0;
+		UINT offset = 0;
+		ID3D11Buffer* nullBuffer = nullptr;
+		D3D11_VIEWPORT viewport = {};
+		viewport.Width = static_cast<float>(output.width);
+		viewport.Height = static_cast<float>(output.height);
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
+
+		float blendFactor[4] = {};
+		ID3D11PixelShader* selectedPixelShader = output.pixelShader.Get();
+		if(output.sourceSampleCount == 2)
+			selectedPixelShader = output.pixelShaderMSAA2.Get();
+		else if(output.sourceSampleCount == 4)
+			selectedPixelShader = output.pixelShaderMSAA4.Get();
+		else if(output.sourceSampleCount >= 8)
+			selectedPixelShader = output.pixelShaderMSAA8.Get();
+
+		output.context->IASetInputLayout(nullptr);
+		output.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		output.context->IASetVertexBuffers(0, 1, &nullBuffer, &stride, &offset);
+		output.context->VSSetShader(output.vertexShader.Get(), nullptr, 0);
+		output.context->PSSetShader(selectedPixelShader, nullptr, 0);
+		ID3D11SamplerState* samplers[1] = { output.sampler.Get() };
+		ID3D11Buffer* constantBuffers[1] = { output.pixelConstants.Get() };
+		ID3D11RenderTargetView* renderTargetViews[1] = { output.renderTargetView.Get() };
+		ID3D11ShaderResourceView* sourceViews[4] = {};
+		if(output.sourceSampleCount == 2)
+			sourceViews[1] = output.sourceView.Get();
+		else if(output.sourceSampleCount == 4)
+			sourceViews[2] = output.sourceView.Get();
+		else if(output.sourceSampleCount >= 8)
+			sourceViews[3] = output.sourceView.Get();
+		else
+			sourceViews[0] = output.sourceView.Get();
+		output.context->PSSetSamplers(0, 1, samplers);
+		output.context->PSSetConstantBuffers(0, 1, constantBuffers);
+		output.context->RSSetState(nullptr);
+		output.context->RSSetViewports(1, &viewport);
+		output.context->OMSetRenderTargets(1, renderTargetViews, nullptr);
+		output.context->OMSetBlendState(nullptr, blendFactor, 0xffffffff);
+		output.context->OMSetDepthStencilState(nullptr, 0);
+		output.context->PSSetShaderResources(0, 4, sourceViews);
+		output.context->Draw(3, 0);
+
+		ID3D11ShaderResourceView* nullViews[4] = {};
+		output.context->PSSetShaderResources(0, 4, nullViews);
+		savedState.Restore(output.context.Get());
+
+		output.swapChain->Present(0, 0);
+		return true;
+	}
+
 	void UNITY_INTERFACE_API OnRenderEvent(int eventId) {
 		std::lock_guard<std::mutex> lock(g_mutex);
 		auto* output = FindOutputLocked(eventId);
@@ -563,21 +723,7 @@ namespace {
 		if(output->closeRequested || !output->visible || !output->source || !output->hwnd)
 			return;
 
-		if(!output->device) {
-			output->source->GetDevice(output->device.GetAddressOf());
-			if(output->device)
-				output->device->GetImmediateContext(output->context.GetAddressOf());
-		}
-
-		if(!CreateSwapChain(*output))
-			return;
-
-		ComPtr<ID3D11Texture2D> backBuffer;
-		if(FAILED(output->swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()))))
-			return;
-
-		output->context->CopyResource(backBuffer.Get(), output->source.Get());
-		output->swapChain->Present(0, 0);
+		RenderOutput(*output);
 	}
 }
 
